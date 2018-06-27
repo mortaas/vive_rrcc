@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   tf2
   tf2_ros
+  dynamic_reconfigure
 )
 
 ## Uncomment this if the package has a setup.py. This macro ensures
@@ -120,10 +121,9 @@ set(OPENVR_INCLUDE_DIR ${OPENVR}/headers)
 ##     and list every .cfg file to be processed
 
 ## Generate dynamic reconfigure parameters in the 'cfg' folder
-# generate_dynamic_reconfigure_options(
-#   cfg/DynReconf1.cfg
-#   cfg/DynReconf2.cfg
-# )
+generate_dynamic_reconfigure_options(
+  cfg/DynReconf.cfg
+)
 
 ###################################
 ## catkin specific configuration ##

@@ -1,29 +1,29 @@
-#include "openvr_ros/vr_interface.h"
+#include "vr_ros/vr_interface.h"
 
-inline void defaultDebugMsgCallback(const std::string &msg) {
+// Default functions for logging
+inline void DefaultDebugMsgCallback(const std::string &msg) {
     std::cerr << "VR Debug: " << msg << std::endl;
 }
-inline void defaultInfoMsgCallback(const std::string &msg) {
+inline void DefaultInfoMsgCallback(const std::string &msg) {
     std::cerr << "VR Info: " << msg << std::endl;
 }
-inline void defaultWarnMsgCallback(const std::string &msg) {
-    std::cerr << "VR Warning: " << msg << std::endl;
+inline void DefaultWarnMsgCallback(const std::string &msg) {
+    std::cerr << "VR Warn: " << msg << std::endl;
 }
-inline void defaultErrorMsgCallback(const std::string &msg) {
+inline void DefaultErrorMsgCallback(const std::string &msg) {
     std::cerr << "VR Error: " << msg << std::endl;
 }
-inline void defaultFatalMsgCallback(const std::string &msg) {
+inline void DefaultFatalMsgCallback(const std::string &msg) {
     std::cerr << "VR Fatal: " << msg << std::endl;
 }
 
 VRInterface::VRInterface() 
-    : debug_(defaultDebugMsgCallback),
-      info_(defaultInfoMsgCallback),
-      warn_(defaultWarnMsgCallback),
-      error_(defaultErrorMsgCallback),
-      fatal_(defaultFatalMsgCallback)
+    : VR_DEBUG(DefaultDebugMsgCallback),
+      VR_INFO(DefaultInfoMsgCallback),
+      VR_WARN(DefaultWarnMsgCallback),
+      VR_ERROR(DefaultErrorMsgCallback),
+      VR_FATAL(DefaultFatalMsgCallback)
 {
-    device_count = vr::k_unMaxTrackedDeviceCount;
 }
 VRInterface::~VRInterface() {
 }
@@ -41,11 +41,11 @@ bool VRInterface::Init() {
 	if (peError != vr::VRInitError_None) {
 		pHMD_ = nullptr;
 
-        fatal_("OpenVR API initialization failed: " + std::string(vr::VR_GetVRInitErrorAsEnglishDescription(peError) ) );
+        VR_FATAL("OpenVR API initialization failed: " + std::string(vr::VR_GetVRInitErrorAsEnglishDescription(peError) ) );
 		return false;
 	}
 
-    info_("OpenVR API initialization succeeded");
+    VR_INFO("OpenVR API initialization succeeded");
     return true;
 }
 
@@ -55,12 +55,12 @@ void VRInterface::Shutdown() {
      * The vr::IVRSystem pointer returned by vr::VR_Init will be invalid after this call is made.
      */
     
-    // Check if the OpenVR API is initialized, else do nothing
+    // Check if the OpenVR API is initialized
     if (pHMD_) {
 		vr::VR_Shutdown();
 		pHMD_ = nullptr;
 	} else {
-        warn_("Attempted to shut down the OpenVR API, but it is not initialized");
+        VR_WARN("Attempted to shut down the OpenVR API, but it is not initialized");
     }
 }
 
@@ -100,24 +100,58 @@ std::string VRInterface::GetStringProperty(vr::TrackedDeviceIndex_t unDeviceInde
 }
 
 void VRInterface::GetControllerState(int device_index, std::vector<float> &axes, std::vector<int> &buttons) {
+      /**
+     * Get controller state and map to axes and buttons
+     */
+
     vr::VRControllerState_t state;
     pHMD_->GetControllerState(device_index, &state, sizeof(vr::VRControllerState_t) );
 
-    for (int i = 0; i < 3; i++) {
-        if((1LL << vr::k_EButton_ApplicationMenu) & state.ulButtonPressed)
-          buttons[0] = 1;
-        if((1LL << vr::k_EButton_SteamVR_Trigger) & state.ulButtonPressed)
-          buttons[1] = 1;
-        if((1LL << vr::k_EButton_SteamVR_Touchpad) & state.ulButtonPressed)
-          buttons[2] = 1;
-        if((1LL << vr::k_EButton_Grip) & state.ulButtonPressed)
-          buttons[3] = 1;
-        // TrackPad axis
-        axes[0] = state.rAxis[0].x;
-        axes[1] = state.rAxis[0].y;
-        // Trigger axis
-        axes[2] = state.rAxis[1].x;
+    // Axes
+    int axes_count = sizeof(state.rAxis)/sizeof(vr::VRControllerAxis_t);
+    axes.resize(2*axes_count);
+
+    int i = 0;
+    for (int j = 0; j < axes_count; j++) {
+        axes[i]     = state.rAxis[j].x;
+        axes[i + 1] = state.rAxis[j].y;
+        
+        i = i + 2;
     }
+
+    // Buttons
+    buttons.assign(13, 0);
+
+    // if ((1LL << vr::k_EButton_System) & state.ulButtonPressed)
+    //     buttons[0] = 1;
+    if ((1LL << vr::k_EButton_ApplicationMenu) & state.ulButtonPressed)
+        buttons[0] = 1; // VIVE controller menu button
+    if ((1LL << vr::k_EButton_Grip) & state.ulButtonPressed)
+        buttons[1] = 1; // VIVE controller grip button
+    if ((1LL << vr::k_EButton_DPad_Left) & state.ulButtonPressed)
+        buttons[2] = 1;
+    if ((1LL << vr::k_EButton_DPad_Up) & state.ulButtonPressed)
+        buttons[3] = 1;
+    if ((1LL << vr::k_EButton_DPad_Right) & state.ulButtonPressed)
+        buttons[4] = 1;
+    if ((1LL << vr::k_EButton_DPad_Down) & state.ulButtonPressed)
+        buttons[5] = 1;
+    if ((1LL << vr::k_EButton_A) & state.ulButtonPressed)
+        buttons[6] = 1;
+
+    if ((1LL << vr::k_EButton_ProximitySensor) & state.ulButtonPressed)
+        buttons[7] = 1;
+    
+    if ((1LL << vr::k_EButton_Axis0) & state.ulButtonPressed)
+        buttons[8] = 1; // VIVE controller touchpad button
+    if ((1LL << vr::k_EButton_Axis1) & state.ulButtonPressed)
+        buttons[9] = 1; // VIVE controller trigger button
+    if ((1LL << vr::k_EButton_Axis2) & state.ulButtonPressed)
+        buttons[10] = 1;
+    if ((1LL << vr::k_EButton_Axis3) & state.ulButtonPressed)
+        buttons[11] = 1;
+    if ((1LL << vr::k_EButton_Axis4) & state.ulButtonPressed)
+        buttons[12] = 1;
 }
 
 std::string VRInterface::GetDeviceSN(int device_index) {
@@ -129,7 +163,7 @@ std::string VRInterface::GetDeviceSN(int device_index) {
 
     std::string device_sn = GetStringProperty(device_index, vr::Prop_SerialNumber_String, &pError);
     if (pError != vr::TrackedProp_Success) {
-        error_("Error occurred when getting serial number from tracked device: " + std::string(pHMD_->GetPropErrorNameFromEnum(pError) ) );
+        VR_ERROR("Error occurred when getting serial number from tracked device: " + std::string(pHMD_->GetPropErrorNameFromEnum(pError) ) );
     }
 
     // !! TODO !!: return tracked property error description instead of name from enum
@@ -192,12 +226,12 @@ void VRInterface::Update() {
     * TrackingUniverseRawAndUncalibrated - provides poses relative to the hardware-specific coordinate system in the driver
     */
     
-    pHMD_->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseRawAndUncalibrated, 0, device_poses_, device_count);
+    pHMD_->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseRawAndUncalibrated, 0, device_poses_, vr::k_unMaxTrackedDeviceCount);
 }
 
 // ROS logging
-void VRInterface::SetDebugMsgCallback(DebugMsgCallback fn) { debug_ = fn; }
-void VRInterface::SetInfoMsgCallback(InfoMsgCallback fn) { info_ = fn; }
-void VRInterface::SetWarnMsgCallback(WarnMsgCallback fn) { warn_ = fn; }
-void VRInterface::SetErrorMsgCallback(ErrorMsgCallback fn) { error_ = fn; }
-void VRInterface::SetFatalMsgCallback(FatalMsgCallback fn) { fatal_ = fn; }
+void VRInterface::SetDebugMsgCallback(DebugMsgCallback fn) { VR_DEBUG = fn; }
+void VRInterface::SetInfoMsgCallback(InfoMsgCallback fn) { VR_INFO = fn; }
+void VRInterface::SetWarnMsgCallback(WarnMsgCallback fn) { VR_WARN = fn; }
+void VRInterface::SetErrorMsgCallback(ErrorMsgCallback fn) { VR_ERROR = fn; }
+void VRInterface::SetFatalMsgCallback(FatalMsgCallback fn) { VR_FATAL = fn; }

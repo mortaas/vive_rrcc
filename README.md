@@ -10,7 +10,7 @@ The package supports the following types of devices:
 * Tracker
 * Lighthouse
 
-It exposes the position and orientation of each device as coordinate frames relative to *world_vr* frame (one of the lighthouses) in the tf tree, which is configurable relative to the *world* frame. The naming scheme of each coordinate frame follows the following structure: &lt;device type&gt;_&lt;serial number&gt;, e.g. *controller_LHR_FF6FFD46*. This results in a structure similar to the tf tree example that is shown below:
+It exposes the position and orientation (pose) of each device as coordinate frames relative to the *world_vr* frame in the tf tree, which is configurable relative to the *world* frame. The naming scheme of each coordinate frame follows the following structure: &lt;device type&gt;_&lt;serial number&gt;, e.g. *controller_LHR_FF6FFD46*. This results in a structure similar to the tf tree example that is shown below:
 
 ![Example of the tf tree structure that is used in this package](frames.png)
 
@@ -18,7 +18,7 @@ It also publishes the linear and angular velocities (twists) of tracked devices 
 
 ## Requirements
 
-## OpenVR SDK
+### OpenVR SDK
 
 The package requires the [OpenVR SDK](https://github.com/ValveSoftware/openvr), which has to be built from the newest available source. It is possible to download and build the source in the correct folder by utilising the following commands:
 ```
@@ -48,14 +48,31 @@ SteamVR is available through [Steam](https://store.steampowered.com/about/), whi
 
 ## Installation
 
-The package is built by cloning this repository into your catkin workspace (/src directory) and then making it with ```catkin_make```.
+The package is built by cloning this repository into your catkin workspace (/src directory) and then making it with ```catkin_make```
 
 ## Usage
 
 The package is simply run by launching the following launch file:
 ```roslaunch vr_ros vr.launch```
 
+*You may have to change the directory paths for Steam and your Catkin workspace in the ```/scripts/launch.sh``` script depending on their location. The package assumes that the directories are in their defuault locations.*
+
+```
+STEAM_RUNTIME=$HOME/.steam/steam/ubuntu12_32/steam-runtime
+CATKIN_WS=$HOME/catkin_ws
+```
+
+## Configuration
+The position and orientation (pose) of each device is defined relative to the *world_vr* frame, which has the same position as one of the lighthouses. This frame has to be defined relative to some defined *world* frame to make sense of the environment. The transformation between these frames are exposed as *x-, y-, z-, yaw-, pitch-, roll-*offset parameters by the [dynamic_reconfigure](http://wiki.ros.org/dynamic_reconfigure) package. This package provides a standard way to change the offset parameters at any time without having to restart the node, and also provides a graphical user interface (GUI) to change these parameters by using [rqt_reconfigure](http://wiki.ros.org/rqt_reconfigure):
+
+```rosrun rqt_reconfigure rqt_reconfigure```.
+
+The parameters from [dynamic_reconfigure](http://wiki.ros.org/dynamic_reconfigure) are currently not saved automatically, and they therefore have to be updated manually in the ```/launch/vr.launch``` file (see [param](http://wiki.ros.org/roslaunch/XML/param)).
+
 ## Compatibility
 
 The package was tested with:
-* OpenVR SDK 1.0.15 and Ubuntu 16.04 LTS running ROS Kinetic Kame (1.12.13)
+* HTC VIVE with OpenVR SDK 1.0.15 and Ubuntu 16.04 LTS running ROS Kinetic Kame (1.12.13)
+
+## To-do list
+* Save and load the parameters that is changed by dynamic reconfigure

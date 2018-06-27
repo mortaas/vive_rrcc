@@ -4,7 +4,7 @@
 #include <openvr.h>
 #include <boost/function.hpp>
 
-#include <array>
+// #include <array>
 #include <string>
 #include <vector>
 #include <iostream>
@@ -17,19 +17,18 @@ typedef boost::function<void(const std::string&)> ErrorMsgCallback;
 typedef boost::function<void(const std::string&)> FatalMsgCallback;
 
 class VRInterface {
-        // OpenVR
-        vr::IVRSystem *pHMD_;
-        vr::TrackedDevicePose_t device_poses_[vr::k_unMaxTrackedDeviceCount];
-        uint32_t device_count;
+    // OpenVR
+    vr::IVRSystem *pHMD_;
+    vr::TrackedDevicePose_t device_poses_[vr::k_unMaxTrackedDeviceCount];
 
-        std::string GetStringProperty(vr::TrackedDeviceIndex_t unDeviceIndex, vr::TrackedDeviceProperty prop, vr::TrackedPropertyError *pError);
+    std::string GetStringProperty(vr::TrackedDeviceIndex_t unDeviceIndex, vr::TrackedDeviceProperty prop, vr::TrackedPropertyError *pError);
 
-        // ROS logging
-        DebugMsgCallback debug_;
-        InfoMsgCallback info_;
-        WarnMsgCallback warn_;
-        ErrorMsgCallback error_;
-        FatalMsgCallback fatal_;
+    // Private callback functions for ROS logging
+    DebugMsgCallback VR_DEBUG;
+    InfoMsgCallback VR_INFO;
+    WarnMsgCallback VR_WARN;
+    ErrorMsgCallback VR_ERROR;
+    FatalMsgCallback VR_FATAL;
 
     public:
         VRInterface();

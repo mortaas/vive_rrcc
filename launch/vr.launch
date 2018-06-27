@@ -2,7 +2,15 @@
 
 <launch>
     <!-- static_transform_publisher x y z yaw pitch roll frame_id child_frame_id -->
-    <node pkg="tf2_ros" type="static_transform_publisher" name="static_vr_publisher" args="0.0 0.0 2.0 0.0 1.57079632679 0.0 world world_vr" />
+    <!-- <node pkg="tf2_ros" type="static_transform_publisher" name="static_vr_publisher" args="0.0 0.0 2.0 0.0 1.57079632679 0.0 world world_vr" /> -->
+
+    <rosparam param="/vr_node/x_offset">0.0</rosparam>
+    <rosparam param="/vr_node/y_offset">0.0</rosparam>
+    <rosparam param="/vr_node/z_offset">2.0</rosparam>
+    <rosparam param="/vr_node/yaw_offset">0.0</rosparam>
+    <rosparam param="/vr_node/pitch_offset">1.57079632679</rosparam>
+    <rosparam param="/vr_node/roll_offset">0.0</rosparam>
+
     <!-- Launch node through steam with shell script -->
     <node name="vr_node" pkg="vr_ros" type="launch.sh" output="screen" required="true"/>
 </launch>
