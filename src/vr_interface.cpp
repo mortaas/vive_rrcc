@@ -1,22 +1,28 @@
 #include "openvr_ros/vr_interface.h"
 
 inline void defaultDebugMsgCallback(const std::string &msg) {
-    std::cerr << "VIVE Debug: " << msg << std::endl;
+    std::cerr << "VR Debug: " << msg << std::endl;
 }
 inline void defaultInfoMsgCallback(const std::string &msg) {
-    std::cerr << "VIVE Info: " << msg << std::endl;
+    std::cerr << "VR Info: " << msg << std::endl;
 }
 inline void defaultWarnMsgCallback(const std::string &msg) {
-    std::cerr << "VIVE Warning: " << msg << std::endl;
+    std::cerr << "VR Warning: " << msg << std::endl;
 }
 inline void defaultErrorMsgCallback(const std::string &msg) {
-    std::cerr << "VIVE Error: " << msg << std::endl;
+    std::cerr << "VR Error: " << msg << std::endl;
 }
 inline void defaultFatalMsgCallback(const std::string &msg) {
-    std::cerr << "VIVE Fatal: " << msg << std::endl;
+    std::cerr << "VR Fatal: " << msg << std::endl;
 }
 
-VRInterface::VRInterface() {
+VRInterface::VRInterface() 
+    : debug_(defaultDebugMsgCallback),
+      info_(defaultInfoMsgCallback),
+      warn_(defaultWarnMsgCallback),
+      error_(defaultErrorMsgCallback),
+      fatal_(defaultFatalMsgCallback)
+{
     device_count = vr::k_unMaxTrackedDeviceCount;
 }
 VRInterface::~VRInterface() {
@@ -31,15 +37,15 @@ bool VRInterface::Init() {
 
 	vr::EVRInitError peError = vr::VRInitError_None;
 	pHMD_ = vr::VR_Init(&peError, vr::VRApplication_Background);
-
+    
 	if (peError != vr::VRInitError_None) {
 		pHMD_ = nullptr;
 
-        // ROS_ERROR("OpenVR API initialization failed: %s", vr::VR_GetVRInitErrorAsEnglishDescription(peError) );
+        fatal_("OpenVR API initialization failed: " + std::string(vr::VR_GetVRInitErrorAsEnglishDescription(peError) ) );
 		return false;
 	}
 
-    // ROS_INFO("OpenVR API initialization succeeded");
+    info_("OpenVR API initialization succeeded");
     return true;
 }
 
@@ -53,7 +59,9 @@ void VRInterface::Shutdown() {
     if (pHMD_) {
 		vr::VR_Shutdown();
 		pHMD_ = nullptr;
-	}
+	} else {
+        warn_("Attempted to shut down the OpenVR API, but it is not initialized");
+    }
 }
 
 std::string VRInterface::GetStringProperty(vr::TrackedDeviceIndex_t unDeviceIndex, vr::TrackedDeviceProperty prop, vr::TrackedPropertyError *pError) {
@@ -85,9 +93,6 @@ std::string VRInterface::GetStringProperty(vr::TrackedDeviceIndex_t unDeviceInde
     // Get string property
     char *pchValue = new char[unBufferSize];
     unBufferSize = pHMD_->GetStringTrackedDeviceProperty(unDeviceIndex, prop, pchValue, unBufferSize, pError);
-    // if (*pError != vr::TrackedProp_Success) {
-    //     // ROS_ERROR("%s", pHMD_->GetPropErrorNameFromEnum(*pError) );
-    // }
     std::string strValue = pchValue;
     delete [] pchValue;
 
@@ -120,13 +125,32 @@ std::string VRInterface::GetDeviceSN(int device_index) {
      * Get the serial number of a tracked device
      */
 
-    return GetStringProperty(device_index, vr::Prop_SerialNumber_String);
+    vr::TrackedPropertyError pError = vr::TrackedProp_UnknownProperty;
+
+    std::string device_sn = GetStringProperty(device_index, vr::Prop_SerialNumber_String, &pError);
+    if (pError != vr::TrackedProp_Success) {
+        error_("Error occurred when getting serial number from tracked device: " + std::string(pHMD_->GetPropErrorNameFromEnum(pError) ) );
+    }
+
+    // !! TODO !!: return tracked property error description instead of name from enum
+
+    // TrackedProp_Success - The property request was successful.
+    // TrackedProp_WrongDataType - The property was requested with the wrong typed function.
+    // TrackedProp_WrongDeviceClass - The property was requested on a tracked device with the wrong class.
+    // TrackedProp_BufferTooSmall - The string property will not fit in the provided buffer. The buffer size needed is returned.
+    // TrackedProp_UnknownProperty - The property enum value is unknown.
+    // TrackedProp_InvalidDevice - The tracked device index was invalid.
+    // TrackedProp_CouldNotContactServer - OpenVR could not contact vrserver to query the device for this property.
+    // TrackedProp_ValueNotProvidedByDevice - The driver for this device returned that it does not provide this specific property for this device.
+    // TrackedProp_StringExceedsMaximumLength - The string property value returned by a driver exceeded the maximum property length of 32k.
+
+    return device_sn;
 }
 
 void VRInterface::GetDevicePose(int device_index, float m[3][4]) {
     /**
-     * Get the pose of a tracked device.
-     * This pose is represented as the top 3 rows of a homogeneous transformation matrix.
+     * Get the pose of a tracked device
+     * This pose is represented as the top 3 rows of a homogeneous transformation matrix
      */
 
     for (int i = 0; i < 3; i++)
@@ -170,3 +194,10 @@ void VRInterface::Update() {
     
     pHMD_->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseRawAndUncalibrated, 0, device_poses_, device_count);
 }
+
+// ROS logging
+void VRInterface::SetDebugMsgCallback(DebugMsgCallback fn) { debug_ = fn; }
+void VRInterface::SetInfoMsgCallback(InfoMsgCallback fn) { info_ = fn; }
+void VRInterface::SetWarnMsgCallback(WarnMsgCallback fn) { warn_ = fn; }
+void VRInterface::SetErrorMsgCallback(ErrorMsgCallback fn) { error_ = fn; }
+void VRInterface::SetFatalMsgCallback(FatalMsgCallback fn) { fatal_ = fn; }

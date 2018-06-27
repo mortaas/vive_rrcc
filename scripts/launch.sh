@@ -1,20 +1,26 @@
 #!/bin/bash
 
-# Get PID of vrserver process
-PID = $(pgrep -f vrserver)
+# # Red error text color (ANSI escape code)
+# ERROR='\033[0;31m'
 
-# Steam runtime and catkin workspace directory path
-STEAM = ~/.steam/steam/ubuntu12_32/steam-runtime
-CATKIN_WS = ~/catkin_ws
+# # Get vrserver process identifier (PID)
+# PID=$(pgrep -f vrserver)
 
-if ($PID == "")
-    then
-        echo "Unable to launch vr_ros: vrserver is not running" 1>&2
-    else
-        if (ps -p $PID > /dev/null)
-            then
-                $STEAM/run.sh $CATKIN_WS/devel/lib/vr_ros/vr_ros_node
-            else
-                echo "Unable to launch vr_ros: vrserver is not running" 1>&2
-        fi
-fi
+# Steam runtime and catkin workspace directory paths
+STEAM_RUNTIME=$HOME/.steam/steam/ubuntu12_32/steam-runtime
+CATKIN_WS=$HOME/catkin_ws
+
+# # Check if PID is empty
+# if [ -n "$PID" ];
+#     then
+#         # Check if process is running
+#         if (ps -p $PID > /dev/null)
+#             then
+                # Run node through Steam
+                $STEAM_RUNTIME/run.sh $CATKIN_WS/devel/lib/vr_ros/vr_ros_node
+#             else
+#                 echo "$ERROR Unable to launch the vr_ros_node: vrserver is not running" 1>&2
+#         fi
+#     else
+#         echo "$ERROR Unable to launch the vr_ros_node: vrserver is not running" 1>&2
+# fi

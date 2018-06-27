@@ -7,17 +7,23 @@
 #include <sensor_msgs/JoyFeedback.h>
 // tf2
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
-#include <tf2_ros/static_transform_broadcaster.h>
+// #include <tf2_ros/static_transform_broadcaster.h>
 #include <tf2_ros/transform_broadcaster.h>
 
 #include "openvr_ros/vr_interface.h"
+
+void handleDebugMessages(const std::string &msg) {ROS_DEBUG(" [VR] %s", msg.c_str() ); }
+void handleInfoMessages(const std::string &msg) {ROS_INFO(" [VR] %s", msg.c_str() ); }
+void handleWarnMessages(const std::string &msg) {ROS_WARN(" [VR] %s", msg.c_str() ); }
+void handleErrorMessages(const std::string &msg) {ROS_ERROR(" [VR] %s", msg.c_str() ); }
+void handleFatalMessages(const std::string &msg) {ROS_FATAL(" [VR] %s", msg.c_str() ); }
 
 class VRNode {
     ros::NodeHandle nh_;
     ros::Rate loop_rate_;
 
     tf2_ros::TransformBroadcaster tf_broadcaster_;
-    tf2_ros::StaticTransformBroadcaster static_tf_broadcaster_;
+    // tf2_ros::StaticTransformBroadcaster static_tf_broadcaster_;
 
     // ROS publisher maps
     std::map<std::string, ros::Publisher> twist_pubs_map_;
@@ -40,21 +46,28 @@ class VRNode {
 
 VRNode::VRNode(int frequency)
     : loop_rate_(frequency),
-      static_tf_broadcaster_(),
+      // static_tf_broadcaster_(),
       tf_broadcaster_(),
       vr_()
 {
-    // Send corrective transform
-    tf2::Transform tf_world_;
-    tf_world_.setOrigin(tf2::Vector3(0, 0, 2.0) );
-    tf_world_.setRotation(tf2::Quaternion(0.0, M_PI/2.0, 0.0) );
+    // ROS logging
+    vr_.SetDebugMsgCallback(handleDebugMessages);
+    vr_.SetInfoMsgCallback(handleInfoMessages);
+    vr_.SetWarnMsgCallback(handleWarnMessages);
+    vr_.SetErrorMsgCallback(handleErrorMessages);
+    vr_.SetFatalMsgCallback(handleFatalMessages);
 
-    geometry_msgs::TransformStamped tf_world_msg_;
-    tf_world_msg_.header.stamp = ros::Time::now();
-    tf_world_msg_.header.frame_id = "world";
-    tf_world_msg_.child_frame_id = "world_vr";
-    tf2::convert(tf_world_, tf_world_msg_.transform);
-    static_tf_broadcaster_.sendTransform(tf_world_msg_);
+    // // Send corrective transform
+    // tf2::Transform tf_world_;
+    // tf_world_.setOrigin(tf2::Vector3(0, 0, 2.0) );
+    // tf_world_.setRotation(tf2::Quaternion(0.0, M_PI/2.0, 0.0) );
+
+    // geometry_msgs::TransformStamped tf_world_msg_;
+    // tf_world_msg_.header.stamp = ros::Time::now();
+    // tf_world_msg_.header.frame_id = "world";
+    // tf_world_msg_.child_frame_id = "world_vr";
+    // tf2::convert(tf_world_, tf_world_msg_.transform);
+    // static_tf_broadcaster_.sendTransform(tf_world_msg_);
 }
 VRNode::~VRNode() {
 }
@@ -172,11 +185,9 @@ int main(int argc, char** argv) {
     VRNode node_(120);
 
     if (!node_.Init() ) {
-        node_.Shutdown();
+        // node_.Shutdown();
         return 0;
     }
-
-    ROS_INFO("OpenVR API initialization succeeded");
 
     while (ros::ok() ) {
         node_.Loop();
