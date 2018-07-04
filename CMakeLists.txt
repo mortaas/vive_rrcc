@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(vr_ros)
+project(vive_bridge)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 add_compile_options(-std=c++11)
@@ -36,7 +36,7 @@ set(OPENVR "$ENV{HOME}/lib/openvr")
 set(THIRDPARTY_DIR ${OPENVR}/samples/thirdparty)
 set(SHARED_SRC_DIR ${OPENVR}/samples/shared)
 
-## OpenVR API path
+## OpenVR SDK path
 find_library(OPENVR_LIBRARIES
   NAMES
     ## Specify one or more possible names for the library
@@ -136,7 +136,7 @@ generate_dynamic_reconfigure_options(
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
 #  INCLUDE_DIRS include
-#  LIBRARIES vr_ros
+#  LIBRARIES vive_bridge
 #  CATKIN_DEPENDS other_catkin_pkg
 #  DEPENDS system_lib
 )
@@ -155,9 +155,9 @@ include_directories(
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
-#   src/${PROJECT_NAME}/vr_ros.cpp
+#   src/${PROJECT_NAME}/vive_bridge.cpp
 # )
-add_library(vr_interface src/vr_interface.cpp)
+add_library(vive_interface src/vive_interface.cpp)
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
@@ -168,8 +168,8 @@ add_library(vr_interface src/vr_interface.cpp)
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(${PROJECT_NAME}_node 
-  src/vr_node.cpp
-  src/vr_interface.cpp
+  src/vive_node.cpp
+  src/vive_interface.cpp
 )
 
 ## Rename C++ executable without prefix
@@ -186,7 +186,7 @@ add_executable(${PROJECT_NAME}_node
 target_link_libraries(${PROJECT_NAME}_node
   ${catkin_LIBRARIES}
   ${OPENVR_LIBRARIES}
-  vr_interface
+  vive_interface
 )
 
 #############
@@ -229,7 +229,7 @@ target_link_libraries(${PROJECT_NAME}_node
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_vr_ros.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_vive_bridge.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()

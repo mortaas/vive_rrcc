@@ -17,7 +17,7 @@ CATKIN_WS=$HOME/catkin_ws
 #         if (ps -p $PID > /dev/null)
 #             then
                 # Run node through Steam
-                $STEAM_RUNTIME/run.sh $CATKIN_WS/devel/lib/vr_ros/vr_ros_node
+                $STEAM_RUNTIME/run.sh $CATKIN_WS/devel/lib/vive_bridge/vive_bridge_node
 #             else
 #                 echo "$ERROR Unable to launch the vr_ros_node: vrserver is not running" 1>&2
 #         fi

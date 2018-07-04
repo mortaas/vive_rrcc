@@ -4,10 +4,10 @@
 #include <openvr.h>
 #include <boost/function.hpp>
 
-// #include <array>
+#include <iostream>
+#include <map>
 #include <string>
 #include <vector>
-#include <iostream>
 
 // ROS logging
 typedef boost::function<void(const std::string&)> DebugMsgCallback;
@@ -16,14 +16,16 @@ typedef boost::function<void(const std::string&)> WarnMsgCallback;
 typedef boost::function<void(const std::string&)> ErrorMsgCallback;
 typedef boost::function<void(const std::string&)> FatalMsgCallback;
 
-class VRInterface {
+class ViveInterface {
     // OpenVR
     vr::IVRSystem *pHMD_;
+    vr::VREvent_t event_;
+    vr::VRControllerState_t controller_state_;
     vr::TrackedDevicePose_t device_poses_[vr::k_unMaxTrackedDeviceCount];
-
+    
     std::string GetStringProperty(vr::TrackedDeviceIndex_t unDeviceIndex, vr::TrackedDeviceProperty prop, vr::TrackedPropertyError *pError);
 
-    // Private callback functions for ROS logging
+    // Callback functions for ROS logging
     DebugMsgCallback VR_DEBUG;
     InfoMsgCallback VR_INFO;
     WarnMsgCallback VR_WARN;
@@ -31,19 +33,21 @@ class VRInterface {
     FatalMsgCallback VR_FATAL;
 
     public:
-        VRInterface();
-        ~VRInterface();
+        ViveInterface();
+        ~ViveInterface();
 
         bool Init();
         void Update();
         void Shutdown();
 
-        bool PoseIsValid(int device_index);
-        void GetControllerState(int device_index, std::vector<float> &axes, std::vector<int> &buttons);
-        int GetDeviceClass(int device_index);
-        void GetDevicePose(int device_index, float m[3][4]);
-        std::string GetDeviceSN(int device_index);
-        void GetDeviceVelocity(int device_index, float linear[3], float angular[3]);
+        bool PoseIsValid(const int &device_index);
+        void GetControllerState(const int &device_index, std::vector<float> &axes, std::vector<int> &buttons);
+        int GetDeviceClass(const int &device_index);
+        void GetDevicePose(const int &device_index, float m[3][4]);
+        std::string GetDeviceSN(const int &device_index);
+        std::string GetDeviceManufacturerName(const int &device_index);
+        void GetDeviceVelocity(const int &device_index, float linear[3], float angular[3]);
+        bool PollNextEvent(int &event_type, int &device_index);
 
         // ROS logging
         void SetDebugMsgCallback(DebugMsgCallback fn);
