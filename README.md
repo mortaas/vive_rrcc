@@ -1,6 +1,6 @@
-# vr_ros
+# vive_bridge
 
-vr_ros is a Robotic Operating System (ROS) package that utilises the [OpenVR SDK](https://github.com/ValveSoftware/openvr) by Valve, to make VR devices such as the HTC VIVE available in a ROS environment. The package is loosely based on an existing [vive_ros](https://github.com/robosavvy/vive_ros) package by RoboSavvy, and it exposes a lot of the same functionality. The essentials of the [OpenVR SDK](https://github.com/ValveSoftware/openvr) is explained in great detail in the [OpenVR Quick Start](https://github.com/osudrl/CassieVrControls/wiki/OpenVR-Quick-Start) guide by Kevin Kellar. The guide is also saved locally in this package under the ```doc/CassieVrControls.wiki``` folder.
+vive_bridge is a Robotic Operating System (ROS) package that utilises the [OpenVR SDK](https://github.com/ValveSoftware/openvr) by Valve, to make VR devices such as the HTC VIVE available in a ROS environment. The package is inspired by an existing [vive_ros](https://github.com/robosavvy/vive_ros) package by RoboSavvy, and it exposes a lot of the same functionality. The essentials of the [OpenVR SDK](https://github.com/ValveSoftware/openvr) is explained in great detail in the [OpenVR Quick Start](https://github.com/osudrl/CassieVrControls/wiki/OpenVR-Quick-Start) guide by Kevin Kellar. The guide is also saved locally in this package under the ```doc/CassieVrControls.wiki``` folder.
 
 
 ## Features
@@ -63,15 +63,30 @@ STEAM_RUNTIME=$HOME/.steam/steam/ubuntu12_32/steam-runtime
 CATKIN_WS=$HOME/catkin_ws
 ```
 
+Applications are generally run through the Steam runtime by running the ```run.sh``` script. The script is in the steam-runtime folder, and takes the application as an argument for the script.
+
+```~/.steam/steam/ubuntu12_32/steam-runtime/run.sh ~/catkin_ws/devel/lib/vive_bridge/vive_bridge_node```
+
 ## Configuration
 
 ![Graphical user interface (GUI) for changing the offset parameters](doc/reconf.png)
 
-The position and orientation (pose) of each device is defined relative to the *world_vr* frame, which has the same position as one of the lighthouses. This frame has to be defined relative to some defined *world* frame to make sense of the environment. The transformation between these frames are exposed as x-, y-, z-, yaw-, pitch-, roll-offset parameters by the [dynamic_reconfigure](http://wiki.ros.org/dynamic_reconfigure) package. This package provides a standard way to change the offset parameters at any time without having to restart the node, and also provides a graphical user interface (GUI) to change these parameters by using [rqt_reconfigure](http://wiki.ros.org/rqt_reconfigure):
+The position and orientation (pose) of each device is defined relative to the *world_vr* frame, which has the same position as one of the lighthouses. This frame has to be defined relative to some defined *world* frame to make sense of the environment. The transformation between these frames are exposed as x-, y-, z- and roll-, pitch-, yaw- (RPY) offset parameters by the [dynamic_reconfigure](http://wiki.ros.org/dynamic_reconfigure) package. This package provides a standard way to change the offset parameters at any time without having to restart the node, and also provides a graphical user interface (GUI) to change these parameters by using [rqt_reconfigure](http://wiki.ros.org/rqt_reconfigure):
 
 ```rosrun rqt_reconfigure rqt_reconfigure```.
 
 The parameters from [dynamic_reconfigure](http://wiki.ros.org/dynamic_reconfigure) are currently not saved automatically, and they therefore have to be updated manually in the ```/launch/vr.launch``` file (see [param](http://wiki.ros.org/roslaunch/XML/param)).
+
+### Coordinate systems
+
+Tracked devices follows the following coordinate system conventions:
+* X-axis equates to pitch
+* Y-axis is up and equates to yaw (except for the VIVE Tracker, which has Z-axis down)
+* Z-axis is approach direction and equates to roll (except for the VIVE Controller, which has Z-axis pointing the opposite way)
+
+![Coordinate system used by the VIVE Head-Mounted Display (HMD)](http://blog.dsky.co/wp-content/uploads/2015/05/dSky-Oculus-XYZ-YPR.jpg)
+![Coordinate system used by the VIVE Controller](doc/vive_controller_coordinate_system.png)
+![Coordinate system used by the VIVE Tracker](doc/vive_tracker_coordinate_system.png)
 
 ## Compatibility
 
@@ -79,4 +94,4 @@ The package was tested with:
 * HTC VIVE with OpenVR SDK 1.0.15 and Ubuntu 16.04 LTS running ROS Kinetic Kame (1.12.13)
 
 ## To-do list
-* Save and load the parameters that is changed by dynamic reconfigure
+* Save and load the parameters that are changed by dynamic reconfigure

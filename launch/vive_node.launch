@@ -6,12 +6,12 @@
 
     <rosparam param="/vr_node/publish_joy">True</rosparam>
     <rosparam param="/vr_node/publish_twist">True</rosparam>
-    <rosparam param="/vr_node/x_offset">0.0</rosparam>
-    <rosparam param="/vr_node/y_offset">0.0</rosparam>
-    <rosparam param="/vr_node/z_offset">2.0</rosparam>
-    <rosparam param="/vr_node/yaw_offset">0.0</rosparam>
-    <rosparam param="/vr_node/pitch_offset">1.57079632679</rosparam>
-    <rosparam param="/vr_node/roll_offset">0.0</rosparam>
+    <rosparam param="/vr_node/x_offset">-0.708375580986</rosparam>
+    <rosparam param="/vr_node/y_offset">1.25077580883</rosparam>
+    <rosparam param="/vr_node/z_offset">1.9955853131</rosparam>
+    <rosparam param="/vr_node/yaw_offset">-2.7223704589</rosparam>
+    <rosparam param="/vr_node/pitch_offset">0.0174707076117</rosparam>
+    <rosparam param="/vr_node/roll_offset">1.57467366024</rosparam>
 
     <!-- Launch node through steam with shell script -->
     <node name="vive_node" pkg="vive_bridge" type="launch.sh" output="screen" required="true"/>

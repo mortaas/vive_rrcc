@@ -69,9 +69,9 @@ void ViveNode::SendOffsetTransform() {
     origin_offset_.setValue(x_offset,
                             y_offset,
                             z_offset);
-    rotation_offset_.setEuler(yaw_offset,
-                              pitch_offset,
-                              roll_offset);
+    rotation_offset_.setRPY(roll_offset,
+                            pitch_offset,
+                            yaw_offset);
     tf_offset_.setOrigin(origin_offset_);
     tf_offset_.setRotation(rotation_offset_);
 
@@ -113,7 +113,8 @@ bool ViveNode::Init() {
     // Corrective transform to make the VIVE trackers follow the 
     // coordinate system conventions for VIVE devices
     origin_tracker_.setZero();
-    rotation_tracker_.setEuler(M_PI, M_PI_2, 0.0);
+    // rotation_tracker_.setEuler(M_PI, M_PI_2, 0.0);
+    rotation_tracker_.setEuler(0.0, M_PI, 0.0);
     tf_tracker_.setOrigin(origin_tracker_);
     tf_tracker_.setRotation(rotation_tracker_);
 
