@@ -29,6 +29,7 @@ The tracked devices are then visualized by adding ```/vive_node/rviz_mesh_marker
 
 *The mesh files has to be supported by RViz, i.e. .stl, .mesh (Ogre) or .dae (COLLADA).*
 
+
 ## Requirements
 
 ### OpenVR SDK
@@ -59,9 +60,11 @@ SteamVR is available through [Steam](https://store.steampowered.com/about/), whi
 
 [Steam](https://store.steampowered.com/about/) is installed by following the *Getting Started* guide on their [Steam for Linux](https://github.com/ValveSoftware/steam-for-linux) tracker. SteamVR should be installed automatically by Steam if there is any VR devices present on your computer. It is also important to meet the **GRAPHICS DRIVER REQUIREMENTS** and the **USB DEVICE REQUIREMENTS** on their [SteamVR for Linux](https://github.com/ValveSoftware/SteamVR-for-Linux) tracker. A complete guide on getting the HTC VIVE up and running in SteamVR is available from: [HTC Vive Installation Guide](https://support.steampowered.com/steamvr/HTC_Vive/).
 
+
 ## Installation
 
 The package is built by cloning this repository into your catkin workspace (catkin_ws/src directory) and then making it with ```catkin_make```
+
 
 ## Usage
 
@@ -97,6 +100,31 @@ The frame names within the ```device_frames``` field can then be used to find th
 
 It is also possible to request this information from the ```/vive_node/tracked_devices``` service, which requests a *std_msgs/Empty* message, and responds with the same format as the ```vive_bridge/TrackedDeviceStamped.msg```. The frame_id is however included as it's own field in the response, instead of being included in the message header.
 
+### Controller axes and buttons
+
+The package currently supports all inputs from the HTC VIVE controller, and the [sensor_msgs/Joy](http://docs.ros.org/melodic/api/sensor_msgs/html/msg/Joy.html) messages have the following format:
+* axes[0] - Trackpad x
+* axes[1] - Trackpad y
+* axes[2] - Trigger
+* buttons[0] - Menu
+* buttons[1] - Grip
+* buttons[2] - Trackpad
+* buttons[3] - Trigger
+
+The package also emulates a numpad when pressing different points on the trackpad button:
+* buttons[ 4] - 1 Left down
+* buttons[ 5] - 2 Center down
+* buttons[ 6] - 3 Right down
+* buttons[ 7] - 4 Left center
+* buttons[ 8] - 5 Center
+* buttons[ 9] - 6 Right center
+* buttons[10] - 7 Left up
+* buttons[11] - 8 Center up
+* buttons[12] - 9 Right up
+
+*The x and y values from touching the trackpad is used to find the corresponding numpad key.*
+
+
 ## Configuration
 
 ![Graphical user interface (GUI) for changing the offset parameters](doc/reconf.png)
@@ -105,7 +133,7 @@ The position and orientation (pose) of each device is defined relative to the *w
 
 ```rosrun rqt_reconfigure rqt_reconfigure```.
 
-The parameters from [dynamic_reconfigure](http://wiki.ros.org/dynamic_reconfigure) are currently not saved automatically, and they therefore have to be updated manually in the ```/launch/vive_launch.launch``` file (see [param](http://wiki.ros.org/roslaunch/XML/param)).
+The parameters from [dynamic_reconfigure](http://wiki.ros.org/dynamic_reconfigure) are currently not saved automatically, and they therefore have to be updated manually in the ```/launch/vive_launch.launch``` file (see [param](http://wiki.ros.org/roslaunch/XML/param)), and in the ```/cfg/DynReconf.cfg``` file (see [How to Write Your First .cfg File](http://wiki.ros.org/dynamic_reconfigure/Tutorials/HowToWriteYourFirstCfgFile)).
 
 ### Coordinate systems
 
@@ -122,11 +150,14 @@ The VIVE Tracker coordinate system is rotated 180&deg; around the x-axis such th
 
 ![Coordinate system used by the VIVE Tracker](doc/vive_tracker_coordinate_system.png) -->
 
+
 ## Compatibility
 
 The package was tested with:
 * HTC VIVE with OpenVR SDK 1.0.15 and Ubuntu 16.04 LTS running ROS Kinetic Kame (1.12.13)
 
+
 ## To-do list
 * Save and load the parameters that are changed by dynamic reconfigure
+* Add D-pad functionality for the VIVE controllers
 * Implement [libsurvive - lightweight HTC Vive library](https://github.com/cnlohr/libsurvive) as an alternative interface to the [OpenVR SDK](https://github.com/ValveSoftware/openvr)

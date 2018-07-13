@@ -102,6 +102,10 @@ class ViveNode {
     // Controller events
     bool button_touched[vr::k_unMaxTrackedDeviceCount];
     bool controller_interaction[vr::k_unMaxTrackedDeviceCount];
+    
+    int dpad_state[vr::k_unMaxTrackedDeviceCount];
+    int FindDpadState(float x, float y);
+    // int HandleDpadState(int dpad_state, float x, float y);
 
     // Temporary values for getting poses and velocities from tracked devices
     float current_pose[3][4];

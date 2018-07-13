@@ -31,6 +31,88 @@ ViveNode::ViveNode(int frequency)
     visual_tools_->enableFrameLocking();
 }
 
+int ViveNode::FindDpadState(float x, float y) {
+     /**
+      * Find the D-pad state of a controller given it's x and y touch coordinates.
+      * The D-pad states corresponds to a numpad, i.e. up is 8, right is 6, down-left is 1...
+      */
+
+    if (x >= 0.5) {
+        if (y >= 0.5) {
+            return 9;
+        } else if (y <= -0.5) {
+            return 3;
+        } else {
+            return 6;
+        }
+    } else if (x <= -0.5) {
+        if (y >= 0.5) {
+            return 7;
+        } else if (y <= -0.5) {
+            return 1;
+        } else {
+            return 4;
+        }
+    } else {
+        if (y >= 0.5) {
+            return 8;
+        } else if (y <= -0.5) {
+            return 2;
+        } else {
+            return 5;
+        }
+    }
+}
+
+// int ViveNode::HandleDpadState(int dpad_state, float x, float y) {
+//      /**
+//       * Handle mirrored swipe motions for emulating D-pad buttons
+//       */
+    
+//     ROS_INFO_STREAM(x);
+//     ROS_INFO_STREAM(y);
+//     int current_dpad_state = FindDpadState(x, y);
+
+//     ROS_INFO_STREAM(current_dpad_state);
+//     switch (current_dpad_state) {
+//         case 5: return 5;
+//                 break;
+//         case 1: if (dpad_state == 9) {
+//                     return 1;
+//                 }
+//                 break;
+//         case 2: if (dpad_state == 8) {
+//                     return 2;
+//                 }
+//                 break;
+//         case 3: if (dpad_state == 7) {
+//                     return 3;
+//                 }
+//                 break;
+//         case 4: if (dpad_state == 6) {
+//                     return 4;
+//                 }
+//                 break;
+        
+//         case 6: if (dpad_state == 4) {
+//                     return 6;
+//                 }
+//                 break;
+//         case 7: if (dpad_state == 3) {
+//                     return 7;
+//                 }
+//                 break;
+//         case 8: if (dpad_state == 2) {
+//                     return 8;
+//                 }
+//                 break;
+//         case 9: if (dpad_state == 1) {
+//                     return 9;
+//                 }
+//                 break;
+//     }
+// }
+
 bool ViveNode::ReturnTrackedDevices(vive_bridge::GetTrackedDevicesRequest &req,
                                     vive_bridge::GetTrackedDevicesResponse &res)
 {
@@ -222,6 +304,9 @@ bool ViveNode::Init() {
         devices_msg_.header.frame_id = "world_vr";
         transform_msg_.header.frame_id = "world_vr";
 
+        joy_msg_.axes.resize(3);
+        joy_msg_.buttons.resize(13);
+
         // Corrective transform to make the VIVE trackers follow the 
         // coordinate system conventions for VIVE devices
         origin_tracker_.setZero();
@@ -238,6 +323,8 @@ bool ViveNode::Init() {
         for (int i = 0; i < vr::k_unMaxTrackedDeviceCount; i++) {
             button_touched[i] = false;
             controller_interaction[i] = false;
+            dpad_state[i] = 5;
+
             device_classes[i] = vr::TrackedDeviceClass_Invalid;
         }
 
@@ -288,6 +375,13 @@ void ViveNode::Loop() {
     // Check if there are any events in the OpenVR queue
     vr_.PollNextEvent(event_type, event_device_index);
 
+    if (publish_joy) {
+        // Update controller interaction flags (clears flag if button is not touched)
+        for (int i = 0; i < device_count; i++) {
+            controller_interaction[i] = false || button_touched[i];
+        }
+    }
+
     if (event_type != vr::VREvent_None &&
         event_device_index != vr::k_unTrackedDeviceIndexInvalid)
     {
@@ -300,20 +394,19 @@ void ViveNode::Loop() {
             PublishMeshes();
         }
 
-        // Handle controller events
         if (publish_joy) {
-            for (int i = 0; i < device_count; i++) {
-                controller_interaction[i] = false || button_touched[i];
-            }
-
+            // Handle controller events
             switch (event_type) {
                 case vr::VREvent_ButtonPress:   controller_interaction[event_device_index] = true;
                                                 break;
                 case vr::VREvent_ButtonUnpress: controller_interaction[event_device_index] = true;
                                                 break;
                 case vr::VREvent_ButtonTouch:   button_touched[event_device_index] = true;
+                                                vr_.GetControllerState(event_device_index, joy_msg_.axes, joy_msg_.buttons);
+                                                dpad_state[event_device_index] = FindDpadState(joy_msg_.axes[0], joy_msg_.axes[1]);
                                                 break;
                 case vr::VREvent_ButtonUntouch: button_touched[event_device_index] = false;
+                                                dpad_state[event_device_index] = 0;
                                                 break;
             }
         }
@@ -377,6 +470,12 @@ void ViveNode::Loop() {
                     joy_msg_.header.frame_id = device_frames[i];
 
                     vr_.GetControllerState(i, joy_msg_.axes, joy_msg_.buttons);
+                    if (dpad_state[i] > 0) {
+                        // Emulate D-pad if the touchpad button is pressed
+                        if (joy_msg_.buttons[2]) {
+                            joy_msg_.buttons[3 + dpad_state[i]] = 1;
+                        }
+                    }
 
                     // Advertise joy topic if the tracked device is new
                     if (joy_pubs_map_.count(device_sns[i]) == 0) {

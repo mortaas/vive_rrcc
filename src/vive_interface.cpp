@@ -120,7 +120,7 @@ void ViveInterface::GetControllerState(const int &device_index, std::vector<floa
     //     i = i + 2;
     // }
     
-    axes.resize(3);
+    // axes.resize(3);
     axes[0] = controller_state_.rAxis[0].x;
     axes[1] = controller_state_.rAxis[0].y;
     axes[2] = controller_state_.rAxis[1].x;
@@ -173,7 +173,7 @@ void ViveInterface::GetControllerState(const int &device_index, std::vector<floa
     //     buttons[13] = 1;
     // }
 
-    buttons.assign(4, 0);
+    buttons.assign(13, 0);
     if (vr::ButtonMaskFromId(vr::k_EButton_ApplicationMenu) & controller_state_.ulButtonPressed) {
         buttons[0] = 1;
     }
