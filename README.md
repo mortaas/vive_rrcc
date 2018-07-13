@@ -96,6 +96,7 @@ uint8 LIGHTHOUSE=4
 * string[] device_frames - Child frames associated with each tracked device
 
 The frame names within the ```device_frames``` field can then be used to find the joy and twist topics of each tracked device, e.g. the twist topic of the first tracked device could be:
+
 ```"/vive_node/twist/" + msg_.device_frames[0]```
 
 It is also possible to request this information from the ```/vive_node/tracked_devices``` service, which requests a *std_msgs/Empty* message, and responds with the same format as the ```vive_bridge/TrackedDeviceStamped.msg```. The frame_id is however included as it's own field in the response, instead of being included in the message header.
@@ -122,7 +123,7 @@ The package also emulates a numpad when pressing different points on the trackpa
 * buttons[11] - 8 Center up
 * buttons[12] - 9 Right up
 
-*The x and y values from touching the trackpad is used to find the corresponding numpad key.*
+*The x and y values from touching the trackpad is used to find the corresponding numpad key. The header also contains the frame_id associated with the tracked device.*
 
 
 ## Configuration
@@ -137,18 +138,20 @@ The parameters from [dynamic_reconfigure](http://wiki.ros.org/dynamic_reconfigur
 
 ### Coordinate systems
 
+![Coordinate system used by the VIVE Head-Mounted Display (HMD)](doc/vive_hmd_coordinate_system.png)
+
+![Coordinate system used by the VIVE Controller](doc/vive_controller_coordinate_system.png)
+
+![Coordinate system used by the VIVE lighthouse](doc/vive_lighthouse_coordinate_system.png)
+
 Tracked devices follows the following coordinate system conventions:
 * X-axis equates to pitch
 * Y-axis is up and equates to yaw (except for the VIVE Tracker, which has Z-axis down)
 * Z-axis is approach direction and equates to roll (except for the VIVE Controller, which has Z-axis pointing the opposite way)
 
+![Coordinate system used by the VIVE Tracker](doc/vive_tracker_coordinate_system.png)
+
 The VIVE Tracker coordinate system is rotated 180&deg; around the x-axis such that the z-axis points upwards. This is because we want the tracker to match the orientation of our reference frame (world), when it is placed horizontally on the ground.
-
-<!-- ![Coordinate system used by the VIVE Head-Mounted Display (HMD)](http://blog.dsky.co/wp-content/uploads/2015/05/dSky-Oculus-XYZ-YPR.jpg)
-
-![Coordinate system used by the VIVE Controller](doc/vive_controller_coordinate_system.png)
-
-![Coordinate system used by the VIVE Tracker](doc/vive_tracker_coordinate_system.png) -->
 
 
 ## Compatibility
@@ -159,5 +162,4 @@ The package was tested with:
 
 ## To-do list
 * Save and load the parameters that are changed by dynamic reconfigure
-* Add D-pad functionality for the VIVE controllers
 * Implement [libsurvive - lightweight HTC Vive library](https://github.com/cnlohr/libsurvive) as an alternative interface to the [OpenVR SDK](https://github.com/ValveSoftware/openvr)
