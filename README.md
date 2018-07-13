@@ -15,7 +15,19 @@ The package exposes the position and orientation (pose) of each device as coordi
 
 ![Example of the tf tree structure that is used in this package](doc/frames.png)
 
-The package can also publishes the linear and angular velocities (twists) of tracked devices as a geometry_msgs/TwistStamped message on the */vr/twist/&lt;device type&gt;_&lt;serial number&gt;* topic, e.g. */vr/twist/controller_LHR_FF6FFD46*. Axes and buttons on controllers can also be published as a sensor_msgs/Joy message on the */vr/joy/&lt;device type&gt;_&lt;serial number&gt;* topic, e.g. */vr/joy/controller_LHR_FF6FFD46*. Joy messages are only published when the controllers are interacted with. These publishers are not enabled by default, but they are easily enabled during runtime by using the [rqt_reconfigure](http://wiki.ros.org/rqt_reconfigure) package.
+The package can also publishes the linear and angular velocities (twists) of tracked devices as a geometry_msgs/TwistStamped message on the */vive_node/twist/&lt;device type&gt;_&lt;serial number&gt;* topic, e.g. */vive_node/twist/controller_LHR_FF6FFD46*. Axes and buttons on controllers can also be published as a sensor_msgs/Joy message on the */vive_node/joy/&lt;device type&gt;_&lt;serial number&gt;* topic, e.g. */vive_node/joy/controller_LHR_FF6FFD46*. Joy messages are only published when the controllers are interacted with. These publishers are not enabled by default, but they are easily enabled during runtime by using the [rqt_reconfigure](http://wiki.ros.org/rqt_reconfigure) package.
+
+### Visualization
+
+It is also possible to visualize the tracked devices by using a MarkerArray display in RViz. The mesh files are defined in the ```launch/vive_node.launch``` file as parameters for each type of device:
+* hmd_mesh_path
+* controller_mesh_path
+* tracker_mesh_path
+* lighthouse_mesh_path
+
+The tracked devices are then visualized by adding ```/vive_node/rviz_mesh_markers``` as *Marker Topic* in a MarkerArray display.
+
+*The mesh files has to be supported by RViz, i.e. .stl, .mesh (Ogre) or .dae (COLLADA).*
 
 ## Requirements
 
@@ -54,7 +66,7 @@ The package is built by cloning this repository into your catkin workspace (catk
 ## Usage
 
 The package is simply run by launching the following launch file:
-```roslaunch vr_ros vr.launch```
+```roslaunch vive_bridge vive_node.launch```
 
 *You may have to change the directory paths for Steam and your Catkin workspace in the ```/scripts/launch.sh``` shell script depending on their location. The package assumes that the directories are in their defuault locations.*
 
@@ -63,9 +75,27 @@ STEAM_RUNTIME=$HOME/.steam/steam/ubuntu12_32/steam-runtime
 CATKIN_WS=$HOME/catkin_ws
 ```
 
-Applications are generally run through the Steam runtime by running the ```run.sh``` script. The script is in the steam-runtime folder, and takes the application as an argument for the script.
-
+*Applications are generally run through the Steam runtime by running the ```run.sh``` script. The script is in the steam-runtime folder, and takes the application as an argument for the script.*
 ```~/.steam/steam/ubuntu12_32/steam-runtime/run.sh ~/catkin_ws/devel/lib/vive_bridge/vive_bridge_node```
+
+### Interacting with the node
+
+The *vive_node* publishes information about the currently tracked devices to the ```/vive_node/tracked_devices``` topic. This topic uses a custom ```vive_bridge/TrackedDeviceStamped.msg``` message that contains information about:
+* frame_id - Fixed VR frame (within the message header)
+* uint8 device_count - Number of tracked devices
+* uint8[] device_classes - Classes of tracked devices (classes are defined within the message):
+```uint8 INVALID=0
+uint8 HMD=1
+uint8 CONTROLLER=2
+uint8 TRACKER=3
+uint8 LIGHTHOUSE=4
+```
+* string[] device_frames - Child frames associated with each tracked device
+
+The frame names within the ```device_frames``` field can then be used to find the joy and twist topics of each tracked device, e.g. the twist topic of the first tracked device could be:
+```"/vive_node/twist/" + msg_.device_frames[0]```
+
+It is also possible to request this information from the ```/vive_node/tracked_devices``` service, which requests a *std_msgs/Empty* message, and responds with the same format as the ```vive_bridge/TrackedDeviceStamped.msg```. The frame_id is however included as it's own field in the response, instead of being included in the message header.
 
 ## Configuration
 
@@ -75,7 +105,7 @@ The position and orientation (pose) of each device is defined relative to the *w
 
 ```rosrun rqt_reconfigure rqt_reconfigure```.
 
-The parameters from [dynamic_reconfigure](http://wiki.ros.org/dynamic_reconfigure) are currently not saved automatically, and they therefore have to be updated manually in the ```/launch/vr.launch``` file (see [param](http://wiki.ros.org/roslaunch/XML/param)).
+The parameters from [dynamic_reconfigure](http://wiki.ros.org/dynamic_reconfigure) are currently not saved automatically, and they therefore have to be updated manually in the ```/launch/vive_launch.launch``` file (see [param](http://wiki.ros.org/roslaunch/XML/param)).
 
 ### Coordinate systems
 
@@ -84,9 +114,13 @@ Tracked devices follows the following coordinate system conventions:
 * Y-axis is up and equates to yaw (except for the VIVE Tracker, which has Z-axis down)
 * Z-axis is approach direction and equates to roll (except for the VIVE Controller, which has Z-axis pointing the opposite way)
 
-![Coordinate system used by the VIVE Head-Mounted Display (HMD)](http://blog.dsky.co/wp-content/uploads/2015/05/dSky-Oculus-XYZ-YPR.jpg)
+The VIVE Tracker coordinate system is rotated 180&deg; around the x-axis such that the z-axis points upwards. This is because we want the tracker to match the orientation of our reference frame (world), when it is placed horizontally on the ground.
+
+<!-- ![Coordinate system used by the VIVE Head-Mounted Display (HMD)](http://blog.dsky.co/wp-content/uploads/2015/05/dSky-Oculus-XYZ-YPR.jpg)
+
 ![Coordinate system used by the VIVE Controller](doc/vive_controller_coordinate_system.png)
-![Coordinate system used by the VIVE Tracker](doc/vive_tracker_coordinate_system.png)
+
+![Coordinate system used by the VIVE Tracker](doc/vive_tracker_coordinate_system.png) -->
 
 ## Compatibility
 
@@ -95,3 +129,4 @@ The package was tested with:
 
 ## To-do list
 * Save and load the parameters that are changed by dynamic reconfigure
+* Implement [libsurvive - lightweight HTC Vive library](https://github.com/cnlohr/libsurvive) as an alternative interface to the [OpenVR SDK](https://github.com/ValveSoftware/openvr)

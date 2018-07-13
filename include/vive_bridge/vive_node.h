@@ -6,9 +6,15 @@
 #include <sensor_msgs/Joy.h>
 #include <sensor_msgs/JoyFeedback.h>
 
+#include <vive_bridge/TrackedDevicesStamped.h>
+#include <vive_bridge/GetTrackedDevices.h>
+
 // Dynamic reconfigure
 #include <dynamic_reconfigure/server.h>
 #include "vive_bridge/ViveConfig.h"
+
+// RViz
+#include <rviz_visual_tools/rviz_visual_tools.h>
 
 // tf2
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
@@ -39,15 +45,30 @@ class ViveNode {
     dynamic_reconfigure::Server<vive_bridge::ViveConfig>::CallbackType callback_type_;
     void ReconfCallback(vive_bridge::ViveConfig &config, uint32_t level);
 
+    // Publishers
+    ros::Publisher devices_pub_;
     // Associate ROS publishers with the serial numbers of tracked devices ("UID")
     std::map<std::string, ros::Publisher> twist_pubs_map_;
     std::map<std::string, ros::Publisher> joy_pubs_map_;
+
+    // Services
+    ros::ServiceServer devices_service_;
+    bool ReturnTrackedDevices(vive_bridge::GetTrackedDevicesRequest &req,
+                              vive_bridge::GetTrackedDevicesResponse &res);
 
     // Messages
     sensor_msgs::Joy joy_msg_;
     geometry_msgs::TwistStamped twist_msg_;
     geometry_msgs::TransformStamped offset_msg_;
     geometry_msgs::TransformStamped transform_msg_;
+
+    vive_bridge::TrackedDevicesStamped devices_msg_;
+    void PublishTrackedDevices();
+
+    // RViz
+    rviz_visual_tools::RvizVisualToolsPtr visual_tools_;
+    std::string lighthouse_mesh_path, tracker_mesh_path, controller_mesh_path, hmd_mesh_path;
+    bool PublishMeshes();
 
     // tf2
     tf2_ros::TransformBroadcaster tf_broadcaster_;
@@ -57,7 +78,7 @@ class ViveNode {
     tf2::Vector3 origin_offset_;
     tf2::Quaternion rotation_offset_;
     tf2::Transform tf_offset_;
-    // Corrective transform for the tracker coordinate system
+    // Corrective transform for the tracker frames
     tf2::Vector3 origin_tracker_;
     tf2::Quaternion rotation_tracker_;
     tf2::Transform tf_tracker_;
@@ -68,19 +89,27 @@ class ViveNode {
 
     // OpenVR interface
     ViveInterface vr_;
-    // Temporary values for event handling
+    
+    // Temporary values for keeping track of tracked devices
+    int device_count;
+    int device_classes[vr::k_unMaxTrackedDeviceCount];
+    std::string device_sns[vr::k_unMaxTrackedDeviceCount];
+    std::string device_frames[vr::k_unMaxTrackedDeviceCount];
+    void UpdateTrackedDevices();
+
+    // Temporary values for handling events
     int event_type, event_device_index;
+    // Controller events
     bool button_touched[vr::k_unMaxTrackedDeviceCount];
     bool controller_interaction[vr::k_unMaxTrackedDeviceCount];
 
     // Temporary values for getting poses and velocities from tracked devices
     float current_pose[3][4];
-    float current_linvel[3], current_angvel[3];
-
     tf2::Matrix3x3 tf_m_basis;
     tf2::Vector3 tf_m_origin;
-
     tf2::Transform tf_current_pose_;
+
+    float current_linvel[3], current_angvel[3];
     tf2::Vector3 tf_current_linvel_, tf_current_angvel_;
     
     public:

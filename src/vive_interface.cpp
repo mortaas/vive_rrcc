@@ -209,34 +209,17 @@ bool ViveInterface::PollNextEvent(int &event_type, int &device_index) {
     }
 }
 
-std::string ViveInterface::GetDeviceSN(const int &device_index) {
+void ViveInterface::GetDeviceSN(const int &device_index, std::string &device_sn) {
     /**
      * Get the serial number of a tracked device
      */
 
     vr::TrackedPropertyError pError = vr::TrackedProp_UnknownProperty;
 
-    std::string device_sn = GetStringProperty(device_index, vr::Prop_SerialNumber_String, &pError);
+    device_sn = GetStringProperty(device_index, vr::Prop_SerialNumber_String, &pError);
     if (pError != vr::TrackedProp_Success) {
         VR_ERROR("Error occurred when getting serial number from tracked device: " + TrackedPropErrorStrings[pError] );
     }
-
-    return device_sn;
-}
-
-std::string ViveInterface::GetDeviceManufacturerName(const int &device_index) {
-    /**
-     * Get the manufacturer name of a tracked device
-     */
-
-    vr::TrackedPropertyError pError = vr::TrackedProp_UnknownProperty;
-
-    std::string device_name = GetStringProperty(device_index, vr::Prop_ManufacturerName_String, &pError);
-    if (pError != vr::TrackedProp_Success) {
-        VR_ERROR("Error occurred when getting manufacturer name from tracked device: " + TrackedPropErrorStrings[pError] );
-    }
-    
-    return device_name;
 }
 
 void ViveInterface::GetDevicePose(const int &device_index, float m[3][4]) {

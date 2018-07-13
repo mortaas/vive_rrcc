@@ -4,14 +4,19 @@
     <!-- static_transform_publisher x y z yaw pitch roll frame_id child_frame_id -->
     <node pkg="tf2_ros" type="static_transform_publisher" name="static_world_publisher" args="0.0 0.0 0.0 0.0 0.0 0.0 world base_link" />
 
-    <rosparam param="/vr_node/publish_joy">True</rosparam>
-    <rosparam param="/vr_node/publish_twist">True</rosparam>
-    <rosparam param="/vr_node/x_offset">-0.708375580986</rosparam>
-    <rosparam param="/vr_node/y_offset">1.25077580883</rosparam>
-    <rosparam param="/vr_node/z_offset">1.9955853131</rosparam>
-    <rosparam param="/vr_node/yaw_offset">-2.7223704589</rosparam>
-    <rosparam param="/vr_node/pitch_offset">0.0174707076117</rosparam>
-    <rosparam param="/vr_node/roll_offset">1.57467366024</rosparam>
+    <rosparam param="/vive_node/hmd_mesh_path">"package://vive_bridge/meshes/vr_hmd_vive_2_0/vr_hmd_vive_2_0.dae"</rosparam>
+    <rosparam param="/vive_node/controller_mesh_path">"package://vive_bridge/meshes/vr_controller_vive_1_5/vr_controller_vive_1_5.dae"</rosparam>
+    <rosparam param="/vive_node/tracker_mesh_path">"package://vive_bridge/meshes/TRACKER-3D.dae"</rosparam>
+    <rosparam param="/vive_node/lighthouse_mesh_path">"package://vive_bridge/meshes/lh_basestation_vive/lh_basestation_vive.dae"</rosparam>
+
+    <rosparam param="/vive_node/publish_joy">True</rosparam>
+    <rosparam param="/vive_node/publish_twist">True</rosparam>
+    <rosparam param="/vive_node/x_offset">-0.708375580986</rosparam>
+    <rosparam param="/vive_node/y_offset">1.25077580883</rosparam>
+    <rosparam param="/vive_node/z_offset">1.9955853131</rosparam>
+    <rosparam param="/vive_node/yaw_offset">-2.7223704589</rosparam>
+    <rosparam param="/vive_node/pitch_offset">0.0174707076117</rosparam>
+    <rosparam param="/vive_node/roll_offset">1.57467366024</rosparam>
 
     <!-- Launch node through steam with shell script -->
     <node name="vive_node" pkg="vive_bridge" type="launch.sh" output="screen" required="true"/>

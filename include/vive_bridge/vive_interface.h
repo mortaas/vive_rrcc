@@ -44,8 +44,7 @@ class ViveInterface {
         void GetControllerState(const int &device_index, std::vector<float> &axes, std::vector<int> &buttons);
         int GetDeviceClass(const int &device_index);
         void GetDevicePose(const int &device_index, float m[3][4]);
-        std::string GetDeviceSN(const int &device_index);
-        std::string GetDeviceManufacturerName(const int &device_index);
+        void GetDeviceSN(const int &device_index, std::string &device_sn);
         void GetDeviceVelocity(const int &device_index, float linear[3], float angular[3]);
         bool PollNextEvent(int &event_type, int &device_index);
 
