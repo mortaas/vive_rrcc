@@ -151,22 +151,30 @@ bool ViveNode::PublishMeshes() {
             case vr::TrackedDeviceClass_HMD:
                 visual_tools_->publishMesh(Eigen::Affine3d::Identity(),
                                            hmd_mesh_path,
-                                           rviz_visual_tools::WHITE);
+                                           rviz_visual_tools::WHITE,
+                                           1,
+                                           device_frames[i]);
                 break;
             case vr::TrackedDeviceClass_Controller:
                 visual_tools_->publishMesh(Eigen::Affine3d::Identity(),
                                            controller_mesh_path,
-                                           rviz_visual_tools::WHITE);
+                                           rviz_visual_tools::WHITE,
+                                           1,
+                                           device_frames[i]);
                 break;
             case vr::TrackedDeviceClass_GenericTracker:
                 visual_tools_->publishMesh(Eigen::Affine3d::Identity(),
                                            tracker_mesh_path,
-                                           rviz_visual_tools::BLACK);
+                                           rviz_visual_tools::BLACK,
+                                           1,
+                                           device_frames[i]);
                 break;
             case vr::TrackedDeviceClass_TrackingReference:
                 visual_tools_->publishMesh(Eigen::Affine3d::Identity(),
                                            lighthouse_mesh_path,
-                                           rviz_visual_tools::WHITE);
+                                           rviz_visual_tools::WHITE,
+                                           1,
+                                           device_frames[i]);
                 break;
         }
     }

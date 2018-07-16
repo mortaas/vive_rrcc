@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+
+<launch>
+    <rosparam param="/vive_calibrating_node/controller">"controller_LHR_FFC4DB41"</rosparam>
+    <rosparam param="/vive_calibrating_node/tracker">"tracker_LHR_3B34A1AA"</rosparam>
+
+    <node name="vive_calibrating_node" pkg="vive_calibrating" type="vive_calibrating_node" output="screen" required="true"/>
+</launch>
