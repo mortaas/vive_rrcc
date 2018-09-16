@@ -1,6 +1,6 @@
 # vive_bridge
 
-vive_bridge is a Robotic Operating System (ROS) package that utilises the [OpenVR SDK](https://github.com/ValveSoftware/openvr) by Valve, to make VR devices such as the HTC VIVE available in a ROS environment. The package is inspired by an existing [vive_ros](https://github.com/robosavvy/vive_ros) package by RoboSavvy, and it exposes a lot of the same functionality. The essentials of the [OpenVR SDK](https://github.com/ValveSoftware/openvr) is explained in great detail in the [OpenVR Quick Start](https://github.com/osudrl/CassieVrControls/wiki/OpenVR-Quick-Start) guide by Kevin Kellar. The guide is also saved locally in this package under the ```doc/CassieVrControls.wiki``` folder.
+vive_bridge is a [Robotic Operating System (ROS)](http://www.ros.org/) package that utilises the [OpenVR SDK](https://github.com/ValveSoftware/openvr) by Valve, to make VR devices such as the HTC VIVE available in a ROS environment. The package is inspired by an existing [vive_ros](https://github.com/robosavvy/vive_ros) package by RoboSavvy, and it exposes a lot of the same functionality. The essentials of the [OpenVR SDK](https://github.com/ValveSoftware/openvr) is explained in great detail in the [OpenVR Quick Start](https://github.com/osudrl/CassieVrControls/wiki/OpenVR-Quick-Start) guide by Kevin Kellar. The guide is also saved locally in this package under the ```doc/CassieVrControls.wiki``` folder.
 
 
 ## Features
@@ -163,3 +163,5 @@ The package was tested with:
 ## To-do list
 * Save and load the parameters that are changed by dynamic reconfigure
 * Implement [libsurvive - lightweight HTC Vive library](https://github.com/cnlohr/libsurvive) as an alternative interface to the [OpenVR SDK](https://github.com/ValveSoftware/openvr)
+* Implement handling of tracked devices with virtual functions for drop-in support of alternative interfaces
+* Implement haptic feedback on the VIVE Controllers

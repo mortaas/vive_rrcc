@@ -31,13 +31,31 @@ void HandleWarnMsgs (const std::string &msg) {ROS_WARN (" [VR] %s", msg.c_str() 
 void HandleErrorMsgs(const std::string &msg) {ROS_ERROR(" [VR] %s", msg.c_str() ); }
 void HandleFatalMsgs(const std::string &msg) {ROS_FATAL(" [VR] %s", msg.c_str() ); }
 
+struct TrackedDevice {
+      /**
+     * Contains values for keeping track of tracked devices and controller user interaction
+     */
+
+    std::string serial_number;
+    std::string frame_id;
+    int device_class;
+
+    // Controller user interaction
+    bool button_touched;
+    bool controller_interaction;
+    // Emulated numpad state
+    int numpad_state;
+};
+
 class ViveNode {
     ros::NodeHandle nh_;
     ros::Rate loop_rate_;
 
     // Parameters
-    bool publish_joy, publish_twist;
-    double x_offset, y_offset, z_offset, yaw_offset, pitch_offset, roll_offset;
+    bool send_tf, publish_joy, publish_twist;
+    std::string vr_frame, robot_frame;
+    double vr_x_offset, vr_y_offset, vr_z_offset, vr_yaw_offset, vr_pitch_offset, vr_roll_offset;
+    double robot_x_offset, robot_y_offset, robot_z_offset, robot_yaw_offset, robot_pitch_offset, robot_roll_offset;
     bool InitParams();
 
     // Dynamic reconfigure
@@ -59,7 +77,7 @@ class ViveNode {
     // Messages
     sensor_msgs::Joy joy_msg_;
     geometry_msgs::TwistStamped twist_msg_;
-    geometry_msgs::TransformStamped offset_msg_;
+    geometry_msgs::TransformStamped vr_offset_msg_, robot_offset_msg_;
     geometry_msgs::TransformStamped transform_msg_;
 
     vive_bridge::TrackedDevicesStamped devices_msg_;
@@ -92,20 +110,13 @@ class ViveNode {
     
     // Temporary values for keeping track of tracked devices
     int device_count;
-    int device_classes[vr::k_unMaxTrackedDeviceCount];
-    std::string device_sns[vr::k_unMaxTrackedDeviceCount];
-    std::string device_frames[vr::k_unMaxTrackedDeviceCount];
+    TrackedDevice TrackedDevices[vr::k_unMaxTrackedDeviceCount];
     void UpdateTrackedDevices();
 
     // Temporary values for handling events
     int event_type, event_device_index;
-    // Controller events
-    bool button_touched[vr::k_unMaxTrackedDeviceCount];
-    bool controller_interaction[vr::k_unMaxTrackedDeviceCount];
-    
-    int dpad_state[vr::k_unMaxTrackedDeviceCount];
-    int FindDpadState(float x, float y);
-    // int HandleDpadState(int dpad_state, float x, float y);
+
+    int FindEmulatedNumpadState(float x, float y);
 
     // Temporary values for getting poses and velocities from tracked devices
     float current_pose[3][4];

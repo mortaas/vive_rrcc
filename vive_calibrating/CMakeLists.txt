@@ -9,15 +9,27 @@ add_compile_options(-std=c++11)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   roscpp
+  rosbag
   tf2
   tf2_ros
+  tf2_eigen
+  geometry_msgs
   sensor_msgs
   dynamic_reconfigure
+  moveit_core
+  moveit_ros_planning_interface
+  rviz_visual_tools
   vive_bridge
 )
 
 ## System dependencies are found with CMake's conventions
 find_package(Boost REQUIRED COMPONENTS system)
+
+find_package(Eigen3 REQUIRED)
+# Eigen 3.2 (Wily) only provides EIGEN3_INCLUDE_DIR, not EIGEN3_INCLUDE_DIRS
+if(NOT EIGEN3_INCLUDE_DIRS)
+  set(EIGEN3_INCLUDE_DIRS ${EIGEN3_INCLUDE_DIR})
+endif()
 
 
 ## Uncomment this if the package has a setup.py. This macro ensures
@@ -136,6 +148,8 @@ include_directories(
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(${PROJECT_NAME}_node src/vive_calibrating_node.cpp)
+add_executable(simple_calibrating_node src/simple_calibrating_node.cpp)
+add_executable(vive_robot_calibrating_node src/vive_robot_calibrating_node.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -149,6 +163,12 @@ add_executable(${PROJECT_NAME}_node src/vive_calibrating_node.cpp)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(${PROJECT_NAME}_node
+  ${catkin_LIBRARIES}
+)
+target_link_libraries(simple_calibrating_node
+  ${catkin_LIBRARIES}
+)
+target_link_libraries(vive_robot_calibrating_node
   ${catkin_LIBRARIES}
 )
 

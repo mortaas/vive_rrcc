@@ -7,7 +7,6 @@
 #include <sensor_msgs/Joy.h>
 
 // Dynamic reconfigure
-// #include <dynamic_reconfigure/server.h>
 #include "vive_calibrating/ViveConfig.h"
 
 #include <dynamic_reconfigure/DoubleParameter.h>
@@ -19,9 +18,6 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
 #include "tf2_eigen/tf2_eigen.h"
-
-// RViz
-#include <rviz_visual_tools/rviz_visual_tools.h>
 
 // Boost
 #include <boost/algorithm/string/predicate.hpp>
@@ -47,18 +43,10 @@ class CalibratingNode {
     // Parameters
     bool InitParams();
 
-    // Dynamic reconfigure
-    // dynamic_reconfigure::Server<vive_calibrating::ViveConfig> reconf_server_;
-    // dynamic_reconfigure::Server<vive_calibrating::ViveConfig>::CallbackType callback_type_;
-    // void ReconfCallback(vive_calibrating::ViveConfig &config, uint32_t level);
-
     // Reconfigure request for changing frame offset, e.g. changing world_vr frame w.r.t. world
     dynamic_reconfigure::ReconfigureRequest srv_reconf_req_;
     dynamic_reconfigure::ReconfigureResponse srv_reconf_resp_;
     vive_calibrating::ViveConfig conf_;
-
-    // RViz
-    rviz_visual_tools::RvizVisualToolsPtr visual_tools_;
 
     // tf2
     tf2_ros::Buffer tf_buffer_;
@@ -67,11 +55,7 @@ class CalibratingNode {
     std::string controller_frame;
     tf2::Transform tf_controller_, tf_controller_offset_;
 
-    Eigen::Affine3d eigen_pose_;
-    Eigen::Vector3d eigen_points_[3], eigen_basis_[3];
     double yaw_offset, pitch_offset, roll_offset;
-
-    int state;
     void CalibrateWorld();
 
     public:
@@ -91,7 +75,7 @@ bool CalibratingNode::InitParams() {
     
     std::string controller;
 
-    bool init_success (nh_.param<std::string>("/vive_calibrating_node/controller", controller, "") );
+    bool init_success = nh_.param<std::string>("/vive_calibrating_node/controller", controller, "");
     
     // Use controller from parameter server
     if (ValidateDeviceID(controller) ) {
@@ -121,10 +105,6 @@ CalibratingNode::CalibratingNode(int frequency)
     // Subscribers
     devices_sub_ = nh_.subscribe("/vive_node/tracked_devices", 1, &CalibratingNode::DevicesCb, this);
 
-    // Set dynamic reconfigure callback function
-    // callback_type_ = boost::bind(&CalibratingNode::ReconfCallback, this, _1, _2);
-    // reconf_server_.setCallback(callback_type_);
-
     // Define dynamic reconfigure message for calibrating frames
     srv_reconf_req_.config.doubles.resize(12);
     srv_reconf_req_.config.doubles[0].name = "vr_x_offset";
@@ -140,10 +120,21 @@ CalibratingNode::CalibratingNode(int frequency)
     srv_reconf_req_.config.doubles[10].name = "robot_pitch_offset";
     srv_reconf_req_.config.doubles[11].name = "robot_roll_offset";
 
-    tf_controller_offset_.setIdentity();
-    tf_controller_offset_.setOrigin(tf2::Vector3(0.001394, -0.077208, -0.038291) );
+    // Pivot point
+    // y  0.002273
+    // z -0.00985
+    // Median point
+    // y -0.025907
+    // z -0.027553
+    // Median point in rotated frame
+    // y -0.036594
+    // z -0.00955
 
-    state = 0;
+    double angle_offset = -atan((0.027553 - 0.00985)/(0.025907 + 0.002273) );
+
+    tf_controller_offset_.setOrigin(tf2::Vector3(0., -0.036594, 0.00955) );
+    tf_controller_offset_.setRotation(tf2::Quaternion(0., 0., 1., 0.) * 
+                                      tf2::Quaternion(std::sin(angle_offset/2), 0., 0., std::cos(angle_offset/2) ) );
 }
 CalibratingNode::~CalibratingNode() {
 }
@@ -157,6 +148,7 @@ void CalibratingNode::CalibrateWorld() {
     // Lookup transformation from VIVE Tracker to world_vr
     tf_msg_ = tf_buffer_.lookupTransform(controller_frame, "world_vr", ros::Time(0) );
     tf2::fromMsg(tf_msg_.transform, tf_controller_);
+    tf_controller_ = tf_controller_offset_*tf_controller_;
 
     // Set new offset parameters based on transformation
     srv_reconf_req_.config.doubles[0].value = tf_controller_.getOrigin().getX();
@@ -176,62 +168,8 @@ void CalibratingNode::JoyCb(const sensor_msgs::Joy& msg_) {
      */
 
     // Trigger button
-    if (msg_.buttons[0]) {
-        switch (state) {
-            case 0:
-                ROS_INFO("Point 1!");
-                ROS_INFO_STREAM(eigen_points_[0].matrix() );
-                state = 1;
-                break;
-            case 1:
-                ROS_INFO("Point 2!");
-                ROS_INFO_STREAM(eigen_points_[1].matrix() );
-
-                eigen_basis_[0] = eigen_points_[1] - eigen_points_[0];
-                eigen_basis_[0] = eigen_basis_[0] / eigen_basis_[0].norm();
-
-                state = 2;
-                break;
-            case 2:
-                ROS_INFO("Point 3!");
-                ROS_INFO_STREAM(eigen_points_[2].matrix() );
-
-                eigen_basis_[1] = eigen_points_[2] - eigen_points_[0];
-                eigen_basis_[1] = eigen_basis_[1] / eigen_basis_[1].norm();
-                eigen_basis_[2] = eigen_basis_[0].cross(eigen_basis_[2]);
-
-                eigen_pose_.matrix().block<3, 1>(0, 0) = eigen_basis_[0];
-                eigen_pose_.matrix().block<3, 1>(0, 1) = eigen_basis_[1];
-                eigen_pose_.matrix().block<3, 1>(0, 2) = eigen_basis_[2];
-                eigen_pose_.matrix().block<3, 1>(0, 3) = eigen_points_[0];
-                ROS_INFO_STREAM(eigen_pose_.matrix() );
-
-                visual_tools_->setLifetime(0);
-                visual_tools_->publishAxisLabeled(eigen_pose_, "World", rviz_visual_tools::LARGE);
-                visual_tools_->trigger();
-                visual_tools_->setLifetime(0.01);
-
-                state = 3;
-                break;
-            case 3:
-                ROS_INFO("Calibrate world");
-
-                // Reset to first point
-                state = 0;
-                break;
-        }
-    }
-
-    // Trackpad button - Calibrates the world frame to hard coded default values
-    if (msg_.buttons[2]) {
-        srv_reconf_req_.config.doubles[0].value = 1.1245388116;
-        srv_reconf_req_.config.doubles[1].value = -0.608462828586;
-        srv_reconf_req_.config.doubles[2].value = 1.49679019946;
-        srv_reconf_req_.config.doubles[3].value = 1.02410968817;
-        srv_reconf_req_.config.doubles[4].value = -0.0623919286899;
-        srv_reconf_req_.config.doubles[5].value = 1.63425725418;
-
-        ros::service::call("/vive_node/set_parameters", srv_reconf_req_, srv_reconf_resp_);
+    if (msg_.buttons[1]) {
+        CalibrateWorld();
     }
 }
 
@@ -311,10 +249,6 @@ bool CalibratingNode::Init() {
         return false;
     }
 
-    visual_tools_.reset(new rviz_visual_tools::RvizVisualTools("world", "/rviz_visual_markers") );
-    visual_tools_->setLifetime(0.01);
-    visual_tools_->setBaseFrame("world");
-    
     return true;
 }
 
@@ -322,40 +256,7 @@ void CalibratingNode::Loop() {
       /**
      * Main loop of the node
      */
-
-    tf_msg_ = tf_buffer_.lookupTransform("world", controller_frame, ros::Time(0) );
-    visual_tools_->resetMarkerCounts();
-
-    switch (state) {
-        case 0:
-            eigen_points_[0] << tf_msg_.transform.translation.x,
-                                tf_msg_.transform.translation.y,
-                                tf_msg_.transform.translation.z;
-
-            // visual_tools_->publishSphere(eigen_points_[0]);
-            // visual_tools_->trigger();
-            break;
-        case 1:
-            eigen_points_[1] << tf_msg_.transform.translation.x,
-                                tf_msg_.transform.translation.y,
-                                tf_msg_.transform.translation.z;
-            
-            visual_tools_->publishLine(eigen_points_[0],
-                                       eigen_points_[1],
-                                       rviz_visual_tools::RED);
-            visual_tools_->trigger();
-            break;
-        case 2:
-            eigen_points_[2] << tf_msg_.transform.translation.x,
-                                tf_msg_.transform.translation.y,
-                                tf_msg_.transform.translation.z;
-            visual_tools_->publishLine(eigen_points_[0],
-                                       eigen_points_[2],
-                                       rviz_visual_tools::GREEN);
-            visual_tools_->trigger();
-            break;
-    }
-
+    
     ros::spinOnce();
     loop_rate_.sleep();
 }
