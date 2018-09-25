@@ -21,14 +21,6 @@
     <rosparam param="/vive_node/vr_pitch_offset">0.0174707076117</rosparam>
     <rosparam param="/vive_node/vr_roll_offset">1.57467366024</rosparam>
 
-    <rosparam param="/vive_node/robot_frame">"base_link"</rosparam>
-    <rosparam param="/vive_node/robot_x_offset">0.0</rosparam>
-    <rosparam param="/vive_node/robot_y_offset">0.0</rosparam>
-    <rosparam param="/vive_node/robot_z_offset">0.5</rosparam>
-    <rosparam param="/vive_node/robot_yaw_offset">0.0</rosparam>
-    <rosparam param="/vive_node/robot_pitch_offset">0.0</rosparam>
-    <rosparam param="/vive_node/robot_roll_offset">0.0</rosparam>
-
     <!-- Launch node through steam with shell script -->
     <node name="vive_node" pkg="vive_bridge" type="launch.sh" output="screen" required="true"/>
 </launch>

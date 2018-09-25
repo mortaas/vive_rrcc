@@ -106,19 +106,13 @@ CalibratingNode::CalibratingNode(int frequency)
     devices_sub_ = nh_.subscribe("/vive_node/tracked_devices", 1, &CalibratingNode::DevicesCb, this);
 
     // Define dynamic reconfigure message for calibrating frames
-    srv_reconf_req_.config.doubles.resize(12);
+    srv_reconf_req_.config.doubles.resize(6);
     srv_reconf_req_.config.doubles[0].name = "vr_x_offset";
     srv_reconf_req_.config.doubles[1].name = "vr_y_offset";
     srv_reconf_req_.config.doubles[2].name = "vr_z_offset";
     srv_reconf_req_.config.doubles[3].name = "vr_yaw_offset";
     srv_reconf_req_.config.doubles[4].name = "vr_pitch_offset";
     srv_reconf_req_.config.doubles[5].name = "vr_roll_offset";
-    srv_reconf_req_.config.doubles[6].name = "robot_x_offset";
-    srv_reconf_req_.config.doubles[7].name = "robot_y_offset";
-    srv_reconf_req_.config.doubles[8].name = "robot_z_offset";
-    srv_reconf_req_.config.doubles[9].name = "robot_yaw_offset";
-    srv_reconf_req_.config.doubles[10].name = "robot_pitch_offset";
-    srv_reconf_req_.config.doubles[11].name = "robot_roll_offset";
 
     // Pivot point
     // y  0.002273
@@ -134,7 +128,8 @@ CalibratingNode::CalibratingNode(int frequency)
 
     tf_controller_offset_.setOrigin(tf2::Vector3(0., -0.036594, 0.00955) );
     tf_controller_offset_.setRotation(tf2::Quaternion(0., 0., 1., 0.) * 
-                                      tf2::Quaternion(std::sin(angle_offset/2), 0., 0., std::cos(angle_offset/2) ) );
+                                      tf2::Quaternion(std::sin(angle_offset/2), 0., 0.,
+                                                      std::cos(angle_offset/2) ) );
 }
 CalibratingNode::~CalibratingNode() {
 }
@@ -231,9 +226,6 @@ bool CalibratingNode::Init() {
             ros::spinOnce();
             ros::Duration(1.0).sleep();
         }
-
-        // conf_.controller = controller_frame;
-        // reconf_server_.updateConfig(conf_);
     }
     ROS_INFO_STREAM("Using " + controller_frame + " for calibration");
 

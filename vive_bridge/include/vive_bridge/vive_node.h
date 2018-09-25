@@ -33,12 +33,12 @@ void HandleFatalMsgs(const std::string &msg) {ROS_FATAL(" [VR] %s", msg.c_str() 
 
 struct TrackedDevice {
       /**
-     * Contains values for keeping track of tracked devices and controller user interaction
+     * Contains values for keeping track of tracked devices and controller interactions
      */
 
     std::string serial_number;
-    std::string frame_id;
-    int device_class;
+    // std::string frame_id;
+    // int device_class;
 
     // Controller user interaction
     bool button_touched;
@@ -53,9 +53,8 @@ class ViveNode {
 
     // Parameters
     bool send_tf, publish_joy, publish_twist;
-    std::string vr_frame, robot_frame;
+    std::string vr_frame;
     double vr_x_offset, vr_y_offset, vr_z_offset, vr_yaw_offset, vr_pitch_offset, vr_roll_offset;
-    double robot_x_offset, robot_y_offset, robot_z_offset, robot_yaw_offset, robot_pitch_offset, robot_roll_offset;
     bool InitParams();
 
     // Dynamic reconfigure
@@ -80,9 +79,6 @@ class ViveNode {
     geometry_msgs::TransformStamped vr_offset_msg_, robot_offset_msg_;
     geometry_msgs::TransformStamped transform_msg_;
 
-    vive_bridge::TrackedDevicesStamped devices_msg_;
-    void PublishTrackedDevices();
-
     // RViz
     rviz_visual_tools::RvizVisualToolsPtr visual_tools_;
     std::string lighthouse_mesh_path, tracker_mesh_path, controller_mesh_path, hmd_mesh_path;
@@ -105,27 +101,26 @@ class ViveNode {
     void ConvertTransform(const float m[3][4], tf2::Transform &tf_m_);
     void SendOffsetTransform();
 
-    // OpenVR interface
-    ViveInterface vr_;
-    
-    // Temporary values for keeping track of tracked devices
-    int device_count;
-    TrackedDevice TrackedDevices[vr::k_unMaxTrackedDeviceCount];
-    void UpdateTrackedDevices();
-
-    // Temporary values for handling events
-    int event_type, event_device_index;
-
-    int FindEmulatedNumpadState(float x, float y);
-
     // Temporary values for getting poses and velocities from tracked devices
     float current_pose[3][4];
-    tf2::Matrix3x3 tf_m_basis;
-    tf2::Vector3 tf_m_origin;
     tf2::Transform tf_current_pose_;
-
     float current_linvel[3], current_angvel[3];
     tf2::Vector3 tf_current_linvel_, tf_current_angvel_;
+    
+    // OpenVR interface
+    ViveInterface vr_;
+    // Temporary values for handling VR events
+    int event_type, event_device_index;
+
+    // Temporary values for keeping track of tracked devices
+    int device_count;
+    vive_bridge::TrackedDevicesStamped devices_msg_;
+    TrackedDevice TrackedDevices[vr::k_unMaxTrackedDeviceCount];
+
+    void UpdateTrackedDevices();
+    void PublishTrackedDevices();
+
+    int FindEmulatedNumpadState(float x, float y);
     
     public:
         ViveNode(int frequency);

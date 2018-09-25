@@ -79,7 +79,7 @@ void ViveInterface::Shutdown() {
 
 std::string ViveInterface::GetStringProperty(vr::TrackedDeviceIndex_t unDeviceIndex, vr::TrackedDeviceProperty prop, vr::TrackedPropertyError *pError) {
       /**
-     * Returns a static string property for a tracked device.
+     * Returns the static string property of a tracked device.
      *  
      * vr::TrackedDeviceIndex unDeviceIndex - Index of the device to get the property for.
      * vr::TrackedDeviceProperty prop - Which property to get.
@@ -103,76 +103,17 @@ std::string ViveInterface::GetStringProperty(vr::TrackedDeviceIndex_t unDeviceIn
 
 void ViveInterface::GetControllerState(const int &device_index, std::vector<float> &axes, std::vector<int> &buttons) {
       /**
-     * Get controller state and map to axes and buttons
+     * Get controller state and map it to axes and buttons
      */
 
     pHMD_->GetControllerState(device_index, &controller_state_, sizeof(vr::VRControllerState_t) );
 
     // Axes
-    // int axes_count = vr::k_unControllerStateAxisCount;
-    // axes.resize(2*axes_count);
-
-    // int i = 0;
-    // for (int j = 0; j < axes_count; j++) {
-    //     axes[i]     = controller_state_.rAxis[j].x;
-    //     axes[i + 1] = controller_state_.rAxis[j].y;
-        
-    //     i = i + 2;
-    // }
-    
-    // axes.resize(3);
     axes[0] = controller_state_.rAxis[0].x;
     axes[1] = controller_state_.rAxis[0].y;
     axes[2] = controller_state_.rAxis[1].x;
 
     // Buttons
-    // buttons.assign(14, 0);
-
-    // if (vr::ButtonMaskFromId(vr::k_EButton_System) & controller_state_.ulButtonPressed) {
-    //     buttons[0] = 1;
-    // }
-    // if (vr::ButtonMaskFromId(vr::k_EButton_ApplicationMenu) & controller_state_.ulButtonPressed) {
-    //     buttons[1] = 1; // VIVE controller menu button
-    // }
-    // if (vr::ButtonMaskFromId(vr::k_EButton_Grip) & controller_state_.ulButtonPressed) {
-    //     buttons[2] = 1; // VIVE controller grip button
-    // }
-    // if (vr::ButtonMaskFromId(vr::k_EButton_DPad_Left) & controller_state_.ulButtonPressed) {
-    //     buttons[3] = 1;
-    // }
-    // if (vr::ButtonMaskFromId(vr::k_EButton_DPad_Up) & controller_state_.ulButtonPressed) {
-    //     buttons[4] = 1;
-    // }
-    // if (vr::ButtonMaskFromId(vr::k_EButton_DPad_Right) & controller_state_.ulButtonPressed) {
-    //     buttons[5] = 1;
-    // }
-    // if (vr::ButtonMaskFromId(vr::k_EButton_DPad_Down) & controller_state_.ulButtonPressed) {
-    //     buttons[6] = 1;
-    // }
-    // if (vr::ButtonMaskFromId(vr::k_EButton_A) & controller_state_.ulButtonPressed) {
-    //     buttons[7] = 1;
-    // }
-
-    // if (vr::ButtonMaskFromId(vr::k_EButton_ProximitySensor) & controller_state_.ulButtonPressed) {
-    //     buttons[8] = 1;
-    // }
-    
-    // if (vr::ButtonMaskFromId(vr::k_EButton_Axis0) & controller_state_.ulButtonPressed) {
-    //     buttons[9] = 1; // VIVE controller touchpad button
-    // }
-    // if (vr::ButtonMaskFromId(vr::k_EButton_Axis1) & controller_state_.ulButtonPressed) {
-    //     buttons[10] = 1; // VIVE controller trigger button
-    // }
-    // if (vr::ButtonMaskFromId(vr::k_EButton_Axis2) & controller_state_.ulButtonPressed) {
-    //     buttons[11] = 1;
-    // }
-    // if (vr::ButtonMaskFromId(vr::k_EButton_Axis3) & controller_state_.ulButtonPressed) {
-    //     buttons[12] = 1;
-    // }
-    // if (vr::ButtonMaskFromId(vr::k_EButton_Axis4) & controller_state_.ulButtonPressed) {
-    //     buttons[13] = 1;
-    // }
-
     buttons.assign(13, 0);
     if (vr::ButtonMaskFromId(vr::k_EButton_ApplicationMenu) & controller_state_.ulButtonPressed) {
         buttons[0] = 1;
@@ -270,7 +211,7 @@ void ViveInterface::Update() {
     pHMD_->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseRawAndUncalibrated, 0, device_poses_, vr::k_unMaxTrackedDeviceCount);
 }
 
-// ROS logging
+// Logging to ROS
 void ViveInterface::SetDebugMsgCallback(DebugMsgCallback fn) { VR_DEBUG = fn; }
 void ViveInterface::SetInfoMsgCallback(InfoMsgCallback fn) { VR_INFO = fn; }
 void ViveInterface::SetWarnMsgCallback(WarnMsgCallback fn) { VR_WARN = fn; }
