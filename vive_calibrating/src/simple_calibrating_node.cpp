@@ -2,22 +2,20 @@
 #include <ros/ros.h>
 
 // ROS msgs
-#include <vive_bridge/TrackedDevicesStamped.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <sensor_msgs/Joy.h>
 
-// Dynamic reconfigure
-#include "vive_calibrating/ViveConfig.h"
+#include "vive_bridge/TrackedDevicesStamped.h"
 
-#include <dynamic_reconfigure/DoubleParameter.h>
-#include <dynamic_reconfigure/Reconfigure.h>
+// Dynamic reconfigure
 #include <dynamic_reconfigure/Config.h>
+#include <dynamic_reconfigure/Reconfigure.h>
+
+#include "vive_calibrating/ViveConfig.h"
 
 // tf2
 #include <tf2_ros/transform_listener.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
-
-#include "tf2_eigen/tf2_eigen.h"
 
 // Boost
 #include <boost/algorithm/string/predicate.hpp>
@@ -30,23 +28,24 @@ class CalibratingNode {
     // Subscribers
     ros::Subscriber joy_sub_;
     ros::Subscriber devices_sub_;
-
     // Callback functions
     void JoyCb(const sensor_msgs::Joy& msg_);
-
     void DevicesCb(const vive_bridge::TrackedDevicesStamped& msg_);
+
     bool ValidateDeviceID(std::string device_id);
 
-    // ROS msgs
+    // msgs
     geometry_msgs::TransformStamped tf_msg_;
 
     // Parameters
+    double yaw_offset, pitch_offset, roll_offset;
     bool InitParams();
+
+    void CalibrateWorld();
 
     // Reconfigure request for changing frame offset, e.g. changing world_vr frame w.r.t. world
     dynamic_reconfigure::ReconfigureRequest srv_reconf_req_;
     dynamic_reconfigure::ReconfigureResponse srv_reconf_resp_;
-    vive_calibrating::ViveConfig conf_;
 
     // tf2
     tf2_ros::Buffer tf_buffer_;
@@ -55,8 +54,6 @@ class CalibratingNode {
     std::string controller_frame;
     tf2::Transform tf_controller_, tf_controller_offset_;
 
-    double yaw_offset, pitch_offset, roll_offset;
-    void CalibrateWorld();
 
     public:
         CalibratingNode(int frequency);
@@ -66,37 +63,6 @@ class CalibratingNode {
         void Loop();
         void Shutdown();
 };
-
-bool CalibratingNode::InitParams() {
-     /**
-      * Initialize parameters from the parameter server.
-      * Return true if the parameters were retrieved from the server, false otherwise.
-      */
-    
-    std::string controller;
-
-    bool init_success = nh_.param<std::string>("/vive_calibrating_node/controller", controller, "");
-    
-    // Use controller from parameter server
-    if (ValidateDeviceID(controller) ) {
-        controller_frame = controller;
-        joy_sub_ = nh_.subscribe("/vive_node/joy/" + controller_frame, 1, &CalibratingNode::JoyCb, this);
-    }
-
-    return init_success;
-}
-
-// void CalibratingNode::ReconfCallback(vive_calibrating::ViveConfig &config, uint32_t level) {
-//      /**
-//       * Dynamic reconfigure callback for changing parameters during runtime
-//       */
-    
-//     // Update controller
-//     if (ValidateDeviceID(config.controller) ) {
-//         controller_frame = config.controller;
-//         joy_sub_ = nh_.subscribe("/vive_node/joy/" + controller_frame, 1, &CalibratingNode::JoyCb, this);
-//     }
-// }
 
 CalibratingNode::CalibratingNode(int frequency)
     : loop_rate_(frequency),
@@ -134,52 +100,6 @@ CalibratingNode::CalibratingNode(int frequency)
 CalibratingNode::~CalibratingNode() {
 }
 
-void CalibratingNode::CalibrateWorld() {
-     /**
-      * Calibrates the world_vr frame based on current VIVE Tracker pose.
-      * Offset parameters are calculated by thinking of the VIVE Tracker frame as the new world frame.
-      */
-    
-    // Lookup transformation from VIVE Tracker to world_vr
-    tf_msg_ = tf_buffer_.lookupTransform(controller_frame, "world_vr", ros::Time(0) );
-    tf2::fromMsg(tf_msg_.transform, tf_controller_);
-    tf_controller_ = tf_controller_offset_*tf_controller_;
-
-    // Set new offset parameters based on transformation
-    srv_reconf_req_.config.doubles[0].value = tf_controller_.getOrigin().getX();
-    srv_reconf_req_.config.doubles[1].value = tf_controller_.getOrigin().getY();
-    srv_reconf_req_.config.doubles[2].value = tf_controller_.getOrigin().getZ();
-    tf_controller_.getBasis().getRPY(roll_offset, pitch_offset, yaw_offset);
-    srv_reconf_req_.config.doubles[3].value = yaw_offset;
-    srv_reconf_req_.config.doubles[4].value = pitch_offset;
-    srv_reconf_req_.config.doubles[5].value = roll_offset;
-    // Send request to the dynamic reconfigure service in vive_node
-    ros::service::call("/vive_node/set_parameters", srv_reconf_req_, srv_reconf_resp_);
-}
-
-void CalibratingNode::JoyCb(const sensor_msgs::Joy& msg_) {
-      /**
-     * Handle VIVE Controller inputs
-     */
-
-    // Trigger button
-    if (msg_.buttons[1]) {
-        CalibrateWorld();
-    }
-}
-
-void CalibratingNode::DevicesCb(const vive_bridge::TrackedDevicesStamped& msg_) {
-      /**
-     * Update controller and tracker frames of tracked devices.
-     */
-
-    for (int i = 0; i < msg_.device_count; i++) {
-        if (msg_.device_classes[i] == msg_.CONTROLLER) {
-            controller_frame = msg_.device_frames[i];
-        }
-    }
-}
-
 bool CalibratingNode::ValidateDeviceID(std::string device_id) {
      /**
       * Validate device ID by checking string format and character length.
@@ -208,6 +128,25 @@ bool CalibratingNode::ValidateDeviceID(std::string device_id) {
     }
 
     return false;
+}
+
+bool CalibratingNode::InitParams() {
+     /**
+      * Initialize parameters from the parameter server.
+      * Return true if the parameters were retrieved from the server, false otherwise.
+      */
+    
+    std::string controller;
+
+    bool init_success = nh_.param<std::string>("/vive_calibrating_node/controller", controller, "");
+    
+    // Use controller from parameter server
+    if (ValidateDeviceID(controller) ) {
+        controller_frame = controller;
+        joy_sub_ = nh_.subscribe("/vive_node/joy/" + controller_frame, 1, &CalibratingNode::JoyCb, this);
+    }
+
+    return init_success;
 }
 
 bool CalibratingNode::Init() {
@@ -260,6 +199,54 @@ void CalibratingNode::Shutdown() {
 
 
 }
+
+void CalibratingNode::JoyCb(const sensor_msgs::Joy& msg_) {
+      /**
+     * Handle VIVE Controller inputs
+     */
+
+    // Trigger button
+    if (msg_.buttons[1]) {
+        CalibrateWorld();
+    }
+}
+
+void CalibratingNode::DevicesCb(const vive_bridge::TrackedDevicesStamped& msg_) {
+      /**
+     * Update controller and tracker frames of tracked devices.
+     */
+
+    for (int i = 0; i < msg_.device_count; i++) {
+        if (msg_.device_classes[i] == msg_.CONTROLLER) {
+            controller_frame = msg_.device_frames[i];
+        }
+    }
+}
+
+void CalibratingNode::CalibrateWorld() {
+     /**
+      * Calibrates the world_vr frame based on current VIVE Tracker pose.
+      * Offset parameters are calculated by thinking of the VIVE Tracker frame as the new world frame.
+      */
+    
+    // Lookup transformation from VIVE Tracker to world_vr
+    tf_msg_ = tf_buffer_.lookupTransform(controller_frame, "world_vr", ros::Time(0) );
+    tf2::fromMsg(tf_msg_.transform, tf_controller_);
+
+    tf_controller_ = tf_controller_offset_*tf_controller_;
+
+    // Set new offset parameters based on transformation
+    srv_reconf_req_.config.doubles[0].value = tf_controller_.getOrigin().getX();
+    srv_reconf_req_.config.doubles[1].value = tf_controller_.getOrigin().getY();
+    srv_reconf_req_.config.doubles[2].value = tf_controller_.getOrigin().getZ();
+    tf_controller_.getBasis().getRPY(roll_offset, pitch_offset, yaw_offset);
+    srv_reconf_req_.config.doubles[3].value = yaw_offset;
+    srv_reconf_req_.config.doubles[4].value = pitch_offset;
+    srv_reconf_req_.config.doubles[5].value = roll_offset;
+    // Send request to the dynamic reconfigure service in vive_node
+    ros::service::call("/vive_node/set_parameters", srv_reconf_req_, srv_reconf_resp_);
+}
+
 
 int main(int argc, char** argv) {
     ros::init(argc, argv, "vive_calibrating_node");

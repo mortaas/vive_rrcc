@@ -103,9 +103,9 @@ endif()
 ##     and list every .cfg file to be processed
 
 # Generate dynamic reconfigure parameters in the 'cfg' folder
-generate_dynamic_reconfigure_options(
-  cfg/DynReconf.cfg
-)
+# generate_dynamic_reconfigure_options(
+#   cfg/DynReconf.cfg
+# )
 
 ###################################
 ## catkin specific configuration ##
@@ -147,7 +147,6 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-add_executable(${PROJECT_NAME}_node src/vive_calibrating_node.cpp)
 add_executable(simple_calibrating_node src/simple_calibrating_node.cpp)
 add_executable(vive_robot_calibrating_node src/vive_robot_calibrating_node.cpp)
 
@@ -162,9 +161,6 @@ add_executable(vive_robot_calibrating_node src/vive_robot_calibrating_node.cpp)
 # add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(${PROJECT_NAME}_node
-  ${catkin_LIBRARIES}
-)
 target_link_libraries(simple_calibrating_node
   ${catkin_LIBRARIES}
 )
