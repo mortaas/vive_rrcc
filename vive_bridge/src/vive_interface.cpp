@@ -72,9 +72,7 @@ void ViveInterface::Shutdown() {
     if (pHMD_) {
 		vr::VR_Shutdown();
 		pHMD_ = nullptr;
-	} else {
-        VR_WARN("Attempted to shut down the OpenVR API, but it is not initialized");
-    }
+	}
 }
 
 std::string ViveInterface::GetStringProperty(vr::TrackedDeviceIndex_t unDeviceIndex, vr::TrackedDeviceProperty prop, vr::TrackedPropertyError *pError) {

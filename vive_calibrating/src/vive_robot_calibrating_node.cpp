@@ -1,10 +1,13 @@
 #include "vive_robot_calibrating_node.h"
 
-
 CalibratingNode::CalibratingNode(int frequency)
     : loop_rate_(frequency),
       tf_listener_(new tf2_ros::TransformListener(tf_buffer_) ),
       move_group_(moveit::planning_interface::MoveGroupInterface(PLANNING_GROUP) ),
+      robot_model_loader_(robot_model_loader::RobotModelLoader("/robot_description") ),
+      kinematic_model_(robot_model_loader_.getModel() ),
+      kinematic_state_(new robot_state::RobotState(kinematic_model_) ),
+      joint_model_group_(kinematic_model_->getJointModelGroup("floor_manipulator") ),
       rng(random_seed() ),
       r_dist(1.1, 1.3),
       theta_dist(5. * M_PI_4, 7. * M_PI_4),
@@ -25,6 +28,14 @@ CalibratingNode::CalibratingNode(int frequency)
     // Set the planning parameters of the move group (MoveIt!)
     move_group_.setPoseReferenceFrame("floor_base");
     move_group_.setMaxVelocityScalingFactor(1.);
+
+    std::vector<double> joint_values;
+    const std::vector<std::string>& joint_names = joint_model_group_->getVariableNames();
+    kinematic_state_->copyJointGroupPositions(joint_model_group_, joint_values);
+    for (std::size_t i = 0; i < joint_names.size(); ++i)
+    {
+    ROS_INFO("Joint %s: %f", joint_names[i].c_str(), joint_values[i]);
+    }
 }
 CalibratingNode::~CalibratingNode() {
 }

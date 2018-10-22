@@ -2,10 +2,14 @@
 #include <ros/ros.h>
 #include <rosbag/bag.h>
 
+#include <actionlib/client/simple_action_client.h>
+
 // ROS msgs
+#include <control_msgs/FollowJointTrajectoryAction.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <sensor_msgs/Joy.h>
 
+// Action client
 #include "vive_bridge/TrackedDevicesStamped.h"
 
 // Dynamic reconfigure
@@ -25,6 +29,10 @@
 
 // MoveIt!
 #include <moveit/move_group_interface/move_group_interface.h>
+
+#include <moveit/robot_model_loader/robot_model_loader.h>
+#include <moveit/robot_model/robot_model.h>
+#include <moveit/robot_state/robot_state.h>
 
 // Boost
 #include <boost/algorithm/string/predicate.hpp>
@@ -46,6 +54,9 @@ class CalibratingNode {
     // Callback functions
     void JoyCb(const sensor_msgs::Joy& msg_);
     void DevicesCb(const vive_bridge::TrackedDevicesStamped& msg_);
+
+    // Action client
+    actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction> *action_client_;
 
     // msgs
     geometry_msgs::TransformStamped tf_msg_;
@@ -72,6 +83,11 @@ class CalibratingNode {
     // MoveIt!
     moveit::planning_interface::MoveGroupInterface move_group_;
     static const std::string PLANNING_GROUP;
+
+    robot_model_loader::RobotModelLoader robot_model_loader_;
+    robot_model::RobotModelPtr kinematic_model_;
+    robot_state::RobotStatePtr kinematic_state_;
+    const robot_state::JointModelGroup* joint_model_group_;
 
     bool MoveRobot(const geometry_msgs::PoseStamped &pose_);
 

@@ -1,3 +1,5 @@
+#include <signal.h>
+
 // ROS
 #include <ros/ros.h>
 // ROS msgs
@@ -37,8 +39,6 @@ struct TrackedDevice {
      */
 
     std::string serial_number;
-    // std::string frame_id;
-    // int device_class;
 
     // Controller user interaction
     bool button_touched;
@@ -52,9 +52,9 @@ class ViveNode {
     ros::Rate loop_rate_;
 
     // Parameters
-    bool send_tf, publish_joy, publish_twist;
-    std::string vr_frame;
-    double vr_x_offset, vr_y_offset, vr_z_offset, vr_yaw_offset, vr_pitch_offset, vr_roll_offset;
+    std::string inertial_frame, vr_frame;
+    double vr_x_offset,   vr_y_offset,     vr_z_offset,
+           vr_yaw_offset, vr_pitch_offset, vr_roll_offset;
     bool InitParams();
 
     // Dynamic reconfigure
