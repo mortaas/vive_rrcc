@@ -8,10 +8,12 @@ CalibratingNode::CalibratingNode(int frequency)
       kinematic_model_(robot_model_loader_.getModel() ),
       kinematic_state_(new robot_state::RobotState(kinematic_model_) ),
       joint_model_group_(kinematic_model_->getJointModelGroup("floor_manipulator") ),
+      action_client_(new actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction>
+                    ("/floor/joint_trajectory_action", true) ),
       rng(random_seed() ),
-      r_dist(1.1, 1.3),
+      r_dist(1.2, 1.4),
       theta_dist(5. * M_PI_4, 7. * M_PI_4),
-      phi_dist(0.5 * M_PI_4, M_PI_4)
+      phi_dist(M_PI_4, 1.5*M_PI_4)
 {
     // Subscribers
     device_sub_ = nh_.subscribe("/vive_node/tracked_devices", 1, &CalibratingNode::DevicesCb, this);
@@ -27,15 +29,17 @@ CalibratingNode::CalibratingNode(int frequency)
     
     // Set the planning parameters of the move group (MoveIt!)
     move_group_.setPoseReferenceFrame("floor_base");
-    move_group_.setMaxVelocityScalingFactor(1.);
+    move_group_.setMaxVelocityScalingFactor(0.05);
 
-    std::vector<double> joint_values;
-    const std::vector<std::string>& joint_names = joint_model_group_->getVariableNames();
-    kinematic_state_->copyJointGroupPositions(joint_model_group_, joint_values);
-    for (std::size_t i = 0; i < joint_names.size(); ++i)
-    {
-    ROS_INFO("Joint %s: %f", joint_names[i].c_str(), joint_values[i]);
-    }
+    ROS_INFO_STREAM(kinematic_model_->getModelFrame().c_str() );
+
+    // std::vector<double> joint_values;
+    // const std::vector<std::string>& joint_names = joint_model_group_->getVariableNames();
+    // kinematic_state_->copyJointGroupPositions(joint_model_group_, joint_values);
+    // for (std::size_t i = 0; i < joint_names.size(); ++i)
+    // {
+    // ROS_INFO("Joint %s: %f", joint_names[i].c_str(), joint_values[i]);
+    // }
 }
 CalibratingNode::~CalibratingNode() {
 }
@@ -85,6 +89,11 @@ bool CalibratingNode::Init() {
 
     //     return false;
     // }
+
+    // Wait for action server
+    ROS_INFO("Waiting for action server...");
+    action_client_->waitForServer();
+    ROS_INFO("Action server ready");
 
     tf_X_.setOrigin(tf2::Vector3(2., -1., 0.5) );
     tf_X_.setRotation(tf2::Quaternion(0., 0., std::sin(M_PI_4), std::cos(M_PI_4) ) );
@@ -176,26 +185,49 @@ geometry_msgs::Pose CalibratingNode::GenerateRandomPose(geometry_msgs::Pose &pos
 
 bool CalibratingNode::MoveRobot(const geometry_msgs::PoseStamped &pose_) {
      /**
-      * Move robot to provided pose, stop, and wait for the dynamics to settle down.
+      * Move robot to provided pose, stop, and wait for the dynamics to settle down.tf_buffer_.waitForTransform("floor_tool0", "controller_frame", ros::Time(0), ros::Duration(10.) );
       * Returns true if trajectory execution succeeded.
       */
+    
+    geometry_msgs::TransformStamped tf_root_ = tf_buffer_.lookupTransform("root", pose_.header.frame_id, ros::Time(0) );
+    geometry_msgs::PoseStamped pose_root_;
+    tf2::doTransform(pose_, pose_root_, tf_root_);
+    
 
-    move_group_.setPoseTarget(pose_);
+    if (kinematic_state_->setFromIK(joint_model_group_, pose_root_.pose, 10, 0.1) ) {
+        std::vector<double> joint_values;
+        kinematic_state_->copyJointGroupPositions(joint_model_group_, joint_values);
+        const std::vector<std::string>& joint_names = joint_model_group_->getVariableNames();
 
-    if (move_group_.move() ) {
-        ROS_INFO_STREAM("Trajectory execution succeeded");
+        control_msgs::FollowJointTrajectoryGoal traj_goal_msg_;
+        traj_goal_msg_.trajectory.header.frame_id = pose_.header.frame_id;
+        traj_goal_msg_.trajectory.joint_names = joint_names;
+        traj_goal_msg_.trajectory.points.push_back(trajectory_msgs::JointTrajectoryPoint() );
+        traj_goal_msg_.trajectory.points[0].positions = joint_values;
+        traj_goal_msg_.trajectory.points[0].velocities = {0., 0., 0., 0., 0., 0.};
+        traj_goal_msg_.trajectory.points[0].accelerations = {0., 0., 0., 0., 0., 0.};
+        traj_goal_msg_.trajectory.points[0].time_from_start = ros::Duration(10.);
 
-        move_group_.stop();
-        ros::Duration(0.5).sleep();
-        return true;
+        action_client_->sendGoalAndWait(traj_goal_msg_);
+
+        // move_group_.setPoseTarget(pose_);
+
+        // if (move_group_.move() ) {
+        //     ROS_INFO_STREAM("Trajectory execution succeeded");
+
+        //     move_group_.stop();
+        //     ros::Duration(0.5).sleep();
+        //     return true;
+        // } else {
+        //     ROS_WARN_STREAM("Trajectory execution failed with pose:" << std::endl
+        //                                                             << pose_.pose);
+
+        //     return false;
+        // }
     } else {
-        ROS_WARN_STREAM("Trajectory execution failed with pose:" << std::endl
-                                                                 << pose_.pose);
-
-        return false;
+        ROS_INFO("Unable to find IK solution");
     }
 }
-
 void CalibratingNode::MeasureRobot(const int &N) {
      /**
       * Runs a calibration routine by moving the robot to N random poses.
@@ -214,6 +246,8 @@ void CalibratingNode::MeasureRobot(const int &N) {
     bag_.open("calib_data_" + boost::posix_time::to_iso_string(ros::Time::now().toBoost() ) + ".bag",
               rosbag::bagmode::Write);
 
+    ros::Duration(3.).sleep();
+
     GenerateRandomPose(pose_msg_.pose);
     pose_msg_.header.stamp = ros::Time::now();
     bag_.write("desired_pose", ros::Time::now(), pose_msg_);
@@ -222,12 +256,12 @@ void CalibratingNode::MeasureRobot(const int &N) {
     MoveRobot(pose_msg_);
 
     std::string pError;
-    if (tf_buffer_.canTransform("floor_tool0", "floor_base", ros::Time(0), &pError) )//&&
-        //tf_buffer_.canTransform(controller_frame, "world_vr", ros::Time(0), &pError) )
+    if (tf_buffer_.canTransform("floor_tool0", "floor_base", ros::Time(0), &pError) &&
+        tf_buffer_.canTransform(controller_frame, "world_vr", ros::Time(0), &pError) )
     {
         // Lookup and convert necessary transforms from msgs
         tf_msg_tool0_ = tf_buffer_.lookupTransform("floor_base", ros::Time(0), "floor_tool0", ros::Time(0), "floor_base");
-        //tf_msg_sensor_ = tf_buffer_.lookupTransform("world_vr", ros::Time(0), controller_frame, ros::Time(0), "world_vr");
+        tf_msg_sensor_ = tf_buffer_.lookupTransform("world_vr", ros::Time(0), controller_frame, ros::Time(0), "world_vr");
         bag_.write("tool0", ros::Time::now(), tf_msg_tool0_);
         bag_.write("sensor", ros::Time::now(), tf_msg_sensor_);
 
@@ -253,13 +287,13 @@ void CalibratingNode::MeasureRobot(const int &N) {
                 {
                     // Lookup and convert necessary transforms
                     tf_msg_tool0_ = tf_buffer_.lookupTransform("floor_base", ros::Time(0), "floor_tool0", ros::Time(0), "floor_base");
-                    //tf_msg_sensor_ = tf_buffer_.lookupTransform("world_vr", ros::Time(0), controller_frame, ros::Time(0), "world_vr");
+                    tf_msg_sensor_ = tf_buffer_.lookupTransform("world_vr", ros::Time(0), controller_frame, ros::Time(0), "world_vr");
                     bag_.write("tool0", ros::Time::now(), tf_msg_tool0_);
                     bag_.write("sensor", ros::Time::now(), tf_msg_sensor_);
 
                     tf2::convert(tf_msg_tool0_.transform, tf_tool0_[1]);
-                    // tf2::convert(tf_msg_sensor_.transform, tf_sensor_[1]);
-                    tf_sensor_[1] = tf_tool0_[1]*tf_X_;
+                    tf2::convert(tf_msg_sensor_.transform, tf_sensor_[1]);
+                    // tf_sensor_[1] = tf_tool0_[1]*tf_X_;
 
                     // Compute transforms between poses
                     tf2::convert(tf_tool0_[0].inverseTimes(tf_tool0_[1]), tf_msg_A_.transform);
@@ -285,9 +319,10 @@ void CalibratingNode::MeasureRobot(const int &N) {
     geometry_msgs::TransformStamped tf_msg_Tx_ = ParkMartin(tf_Avec_.data(),
                                                             tf_Bvec_.data(),
                                                             tf_Avec_.size() );
+    ROS_INFO_STREAM(tf_msg_Tx_);
     bag_.write("X", ros::Time::now(), tf_msg_Tx_);
 
-    ConstructTMatrix(tf_Avec_.data(), tf_Bvec_.data(), tf_Avec_.size() );
+    // ConstructTMatrix(tf_Avec_.data(), tf_Bvec_.data(), tf_Avec_.size() );
     bag_.close();
 }
 

@@ -25,10 +25,6 @@ ViveNode::ViveNode(int frequency)
     // Publisher and service for info about tracked devices
     devices_pub_ = nh_.advertise<vive_bridge::TrackedDevicesStamped>("tracked_devices", 10, true);
     devices_service_ = nh_.advertiseService("tracked_devices", &ViveNode::ReturnTrackedDevices, this);
-
-    // Set dynamic reconfigure callback function
-    callback_type_ = boost::bind(&ViveNode::ReconfCallback, this, _1, _2);
-    reconf_server_.setCallback(callback_type_);
 }
 
 int ViveNode::FindEmulatedNumpadState(float x, float y) {
@@ -195,7 +191,6 @@ void ViveNode::SendOffsetTransform() {
 
     tf2::convert(tf_offset_, vr_offset_msg_.transform);
 
-    vr_offset_msg_.child_frame_id = vr_frame;
     vr_offset_msg_.header.stamp = ros::Time::now();
     static_tf_broadcaster_.sendTransform(vr_offset_msg_);
 }
@@ -270,7 +265,15 @@ bool ViveNode::Init() {
             ROS_WARN_STREAM("Failed to get parameters from the parameter server.");
             ROS_WARN_STREAM("Using default parameters.");
         }
-        SendOffsetTransform();
+
+        vr_offset_msg_.header.frame_id = inertial_frame;
+        vr_offset_msg_.child_frame_id = vr_frame;
+
+        // Set dynamic reconfigure callback function
+        callback_type_ = boost::bind(&ViveNode::ReconfCallback, this, _1, _2);
+        reconf_server_.setCallback(callback_type_);
+
+        // SendOffsetTransform();
 
         // Offset transform message headers
         vr_offset_msg_.header.frame_id = inertial_frame;

@@ -148,6 +148,7 @@ include_directories(
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(simple_calibrating_node src/simple_calibrating_node.cpp)
+add_executable(manual_calibrating_node src/manual_calibrating_node.cpp)
 add_executable(vive_robot_calibrating_node src/vive_robot_calibrating_node.cpp)
 
 ## Rename C++ executable without prefix
@@ -162,6 +163,9 @@ add_executable(vive_robot_calibrating_node src/vive_robot_calibrating_node.cpp)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(simple_calibrating_node
+  ${catkin_LIBRARIES}
+)
+target_link_libraries(manual_calibrating_node
   ${catkin_LIBRARIES}
 )
 target_link_libraries(vive_robot_calibrating_node
