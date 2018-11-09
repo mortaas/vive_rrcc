@@ -256,12 +256,12 @@ void CalibratingNode::MeasureRobot(const int &N) {
     MoveRobot(pose_msg_);
 
     std::string pError;
-    if (tf_buffer_.canTransform("floor_tool0", "floor_base", ros::Time(0), &pError) &&
-        tf_buffer_.canTransform(controller_frame, "world_vr", ros::Time(0), &pError) )
+    if (tf_buffer_.canTransform("floor_tool0", "floor_base", ros::Time(0), &pError) ) // &&
+        // tf_buffer_.canTransform(controller_frame, "world_vr", ros::Time(0), &pError) )
     {
         // Lookup and convert necessary transforms from msgs
         tf_msg_tool0_ = tf_buffer_.lookupTransform("floor_base", ros::Time(0), "floor_tool0", ros::Time(0), "floor_base");
-        tf_msg_sensor_ = tf_buffer_.lookupTransform("world_vr", ros::Time(0), controller_frame, ros::Time(0), "world_vr");
+        // tf_msg_sensor_ = tf_buffer_.lookupTransform("world_vr", ros::Time(0), controller_frame, ros::Time(0), "world_vr");
         bag_.write("tool0", ros::Time::now(), tf_msg_tool0_);
         bag_.write("sensor", ros::Time::now(), tf_msg_sensor_);
 
@@ -287,13 +287,13 @@ void CalibratingNode::MeasureRobot(const int &N) {
                 {
                     // Lookup and convert necessary transforms
                     tf_msg_tool0_ = tf_buffer_.lookupTransform("floor_base", ros::Time(0), "floor_tool0", ros::Time(0), "floor_base");
-                    tf_msg_sensor_ = tf_buffer_.lookupTransform("world_vr", ros::Time(0), controller_frame, ros::Time(0), "world_vr");
+                    // tf_msg_sensor_ = tf_buffer_.lookupTransform("world_vr", ros::Time(0), controller_frame, ros::Time(0), "world_vr");
                     bag_.write("tool0", ros::Time::now(), tf_msg_tool0_);
                     bag_.write("sensor", ros::Time::now(), tf_msg_sensor_);
 
                     tf2::convert(tf_msg_tool0_.transform, tf_tool0_[1]);
-                    tf2::convert(tf_msg_sensor_.transform, tf_sensor_[1]);
-                    // tf_sensor_[1] = tf_tool0_[1]*tf_X_;
+                    // tf2::convert(tf_msg_sensor_.transform, tf_sensor_[1]);
+                    tf_sensor_[1] = tf_tool0_[1]*tf_X_;
 
                     // Compute transforms between poses
                     tf2::convert(tf_tool0_[0].inverseTimes(tf_tool0_[1]), tf_msg_A_.transform);

@@ -10,12 +10,13 @@ add_compile_options(-std=c++11)
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   rosbag
+  dynamic_reconfigure
+  message_generation
+  geometry_msgs
+  sensor_msgs
   tf2
   tf2_ros
   tf2_eigen
-  geometry_msgs
-  sensor_msgs
-  dynamic_reconfigure
   moveit_core
   moveit_ros_planning_interface
   rviz_visual_tools
@@ -69,11 +70,11 @@ endif()
 # )
 
 ## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   Service1.srv
-#   Service2.srv
-# )
+add_service_files(
+  FILES
+  AddSample.srv
+  ComputeCalibration.srv
+)
 
 ## Generate actions in the 'action' folder
 # add_action_files(
@@ -83,10 +84,10 @@ endif()
 # )
 
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   geometry_msgs#   moveit_msgs#   shape_msgs
-# )
+generate_messages(
+  DEPENDENCIES
+  geometry_msgs#   moveit_msgs#   shape_msgs
+)
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -120,6 +121,7 @@ catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES vive_calibrating
 #  CATKIN_DEPENDS geometry_msgs moveit_msgs roscpp shape_msgs
+   CATKIN_DEPENDS message_runtime
 #  DEPENDS system_lib
 )
 
@@ -150,6 +152,7 @@ include_directories(
 add_executable(simple_calibrating_node src/simple_calibrating_node.cpp)
 add_executable(manual_calibrating_node src/manual_calibrating_node.cpp)
 add_executable(vive_robot_calibrating_node src/vive_robot_calibrating_node.cpp)
+add_executable(parkmartin_node src/parkmartin_node.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -169,6 +172,9 @@ target_link_libraries(manual_calibrating_node
   ${catkin_LIBRARIES}
 )
 target_link_libraries(vive_robot_calibrating_node
+  ${catkin_LIBRARIES}
+)
+target_link_libraries(parkmartin_node
   ${catkin_LIBRARIES}
 )
 

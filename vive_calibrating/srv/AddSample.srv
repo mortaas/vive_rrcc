@@ -1,0 +1,7 @@
+# Wrist transformation between two poses
+geometry_msgs/TransformStamped A
+# Sensor transformation between two poses
+geometry_msgs/TransformStamped B
+---
+# Number of sampled pairs (A, B)
+uint16 n
