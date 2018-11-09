@@ -125,9 +125,13 @@ bool ViveNode::PublishMeshes() {
                                            devices_msg_.device_frames[i]);
                 break;
         }
+    bag_.open("calib_data_" + boost::posix_time::to_iso_string(ros::Time::now().toBoost() ) + ".bag",
+              rosbag::bagmode::Write);
     }
 
-    return visual_tools_->trigger();
+    retur
+    bag_.open("calib_data_" + boost::posix_time::to_iso_string(ros::Time::now().toBoost() ) + ".bag",
+              rosbag::bagmode::Write);
 }
 
 ViveNode::~ViveNode() {
@@ -250,9 +254,6 @@ void ViveNode::UpdateTrackedDevices() {
             devices_msg_.device_frames[i] = "";
         }
     }
-
-    // Publish meshes in case of changes to the tracked devices
-    PublishMeshes();
 }
 
 bool ViveNode::Init() {
@@ -283,6 +284,7 @@ bool ViveNode::Init() {
         visual_tools_.reset(new rviz_visual_tools::RvizVisualTools(inertial_frame, "rviz_mesh_markers") );
         visual_tools_->loadMarkerPub(false, true);
         visual_tools_->enableFrameLocking();
+        visual_tools_->setLifetime(0);
 
         // Corrective transform to make the VIVE trackers follow the 
         // coordinate system conventions of the other VIVE devices
@@ -323,6 +325,9 @@ void ViveNode::PublishTrackedDevices() {
 
     devices_msg_.header.stamp = ros::Time::now();
     devices_pub_.publish(devices_msg_);
+
+    // Publish meshes in case of changes to the tracked devices
+    PublishMeshes();
 }
 
 void ViveNode::Shutdown() {
@@ -355,11 +360,16 @@ void ViveNode::Loop() {
     {
         // Update and publish info about tracked devices if there are changes
         if (event_type == vr::VREvent_TrackedDeviceActivated ||
-            event_type == vr::VREvent_TrackedDeviceDeactivated)
+            event_type == vr::VREvent_TrackedDeviceDeactivated ||
+            event_type == vr::VREvent_TrackedDeviceUpdated)
         {
             UpdateTrackedDevices();
             PublishTrackedDevices();
         }
+
+        // if (event_type == vr::VREvent_TrackedDeviceUpdated) {
+        //     PublishMeshes();
+        // }
 
         // Handle controller events
         switch (event_type) {
