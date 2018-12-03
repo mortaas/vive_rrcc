@@ -158,6 +158,8 @@ CalibratingNode::CalibratingNode(int frequency)
     srv_reconf_req_.config.doubles[3].name = "vr_yaw_offset";
     srv_reconf_req_.config.doubles[4].name = "vr_pitch_offset";
     srv_reconf_req_.config.doubles[5].name = "vr_roll_offset";
+
+    n_samples = 0;
 }
 CalibratingNode::~CalibratingNode() {
 }
@@ -271,7 +273,9 @@ void CalibratingNode::JoyCb(const sensor_msgs::Joy& msg_) {
 
     // Grip button
     if (msg_.buttons[1]) {
-        Measure();
+        if (Measure() ) {
+            n_samples++;
+        }
     }
     // Menu button
     if (msg_.buttons[0]) {

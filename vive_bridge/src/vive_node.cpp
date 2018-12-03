@@ -127,6 +127,8 @@ bool ViveNode::PublishMeshes() {
         }
     }
 
+    visual_tools_->trigger();
+
     return true;
 }
 
@@ -363,9 +365,9 @@ void ViveNode::Loop() {
             PublishTrackedDevices();
         }
 
-        // if (event_type == vr::VREvent_TrackedDeviceUpdated) {
-        //     PublishMeshes();
-        // }
+        if (event_type == vr::VREvent_TrackedDeviceUpdated) {
+            PublishMeshes();
+        }
 
         // Handle controller events
         switch (event_type) {

@@ -129,6 +129,8 @@ class CalibratingNode {
     geometry_msgs::Pose SphereNormalPose(double r, double theta, double phi, geometry_msgs::Pose &pose_);
     geometry_msgs::Pose GenerateRandomPose(geometry_msgs::Pose &pose_);
 
+    bool GetJointPositionsFromIK(const geometry_msgs::PoseStamped &pose_, std::vector<double> joint_values);
+    
     public:
         CalibratingNode(int frequency);
         ~CalibratingNode();

@@ -197,6 +197,14 @@ void GenerateJointTrajectorySine(trajectory_msgs::JointTrajectory traj_msg_, std
     }
 }
 
+bool CalibratingNode::GetJointPositionsFromIK(const geometry_msgs::PoseStamped &pose_, std::vector<double> joint_values) {
+    geometry_msgs::TransformStamped tf_root_ = tf_buffer_.lookupTransform("root", pose_.header.frame_id, ros::Time(0) );
+    geometry_msgs::PoseStamped pose_root_;
+    tf2::doTransform(pose_, pose_root_, tf_root_);
+
+    
+}
+
 bool CalibratingNode::MoveRobot(const geometry_msgs::PoseStamped &pose_) {
      /**
       * Move robot to provided pose, stop, and wait for the dynamics to settle down.
