@@ -8,6 +8,9 @@
 #include <control_msgs/FollowJointTrajectoryAction.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <sensor_msgs/Joy.h>
+// Service msgs
+#include <vive_calibrating/AddSample.h>
+#include <vive_calibrating/ComputeCalibration.h>
 
 // Action client
 #include "vive_bridge/TrackedDevicesStamped.h"
@@ -55,6 +58,9 @@ class CalibratingNode {
     void JoyCb(const sensor_msgs::Joy& msg_);
     void DevicesCb(const vive_bridge::TrackedDevicesStamped& msg_);
 
+    // Service
+    ros::ServiceClient sample_client, compute_client;
+
     // Action client
     actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction> *action_client_;
 
@@ -83,7 +89,7 @@ class CalibratingNode {
     // MoveIt!
     moveit::planning_interface::MoveGroupInterface move_group_;
     static const std::string PLANNING_GROUP;
-
+    // RobotState
     robot_model_loader::RobotModelLoader robot_model_loader_;
     robot_model::RobotModelPtr kinematic_model_;
     robot_state::RobotStatePtr kinematic_state_;
@@ -101,6 +107,8 @@ class CalibratingNode {
     
     tf2::Transform tf_pose_;
 
+    void MeasureRobot(const int &N);
+
     // Eigen
     Eigen::Affine3d eigen_Ta_, eigen_Tb_;
     Eigen::Matrix3d eigen_Rx_, eigen_M_;
@@ -113,27 +121,13 @@ class CalibratingNode {
                                                const int &size);
     void ParkMartinExample();
 
-    Eigen::Matrix3d AntisymmetricMatrix(const Eigen::Vector3d &eigen_v_);
-    Eigen::Matrix<double, 6, 8> ConstructSMatrix(const Eigen::Quaterniond &eigen_qrA_,
-                                                 const Eigen::Quaterniond &eigen_qdA_,
-                                                 const Eigen::Quaterniond &eigen_qrB_,
-                                                 const Eigen::Quaterniond &eigen_qdB_);
-    
-    void TransformToDualQuaternion(const geometry_msgs::Transform &tf_msg_,
-                                   Eigen::Quaterniond &eigen_qr_,
-                                   Eigen::Quaterniond &eigen_qd_);
-    Eigen::MatrixXd ConstructTMatrix(const geometry_msgs::Transform tf_Ta_[],
-                                     const geometry_msgs::Transform tf_Tb_[],
-                                     const int &size);
-
-    geometry_msgs::Pose SphereNormalPose(double r, double theta, double phi, geometry_msgs::Pose &pose_);
-    geometry_msgs::Pose GenerateRandomPose(geometry_msgs::Pose &pose_);
-    void MeasureRobot(const int &N);
-
     // Random number generator (RNG) for generating random poses
     std::uniform_real_distribution<double> r_dist, theta_dist, phi_dist;
     std::random_device random_seed;
     std::mt19937_64 rng;
+
+    geometry_msgs::Pose SphereNormalPose(double r, double theta, double phi, geometry_msgs::Pose &pose_);
+    geometry_msgs::Pose GenerateRandomPose(geometry_msgs::Pose &pose_);
 
     public:
         CalibratingNode(int frequency);

@@ -18,6 +18,10 @@ CalibratingNode::CalibratingNode(int frequency)
     // Subscribers
     device_sub_ = nh_.subscribe("/vive_node/tracked_devices", 1, &CalibratingNode::DevicesCb, this);
 
+    // Services
+    sample_client =  nh_.serviceClient<vive_calibrating::AddSample>("/vive_calibration/add_sample");
+    compute_client = nh_.serviceClient<vive_calibrating::ComputeCalibration>("/vive_calibration/compute_calibration");
+
     // Define dynamic reconfigure message for calibrating frames
     srv_reconf_req_.config.doubles.resize(6);
     srv_reconf_req_.config.doubles[0].name = "vr_x_offset";
@@ -27,19 +31,10 @@ CalibratingNode::CalibratingNode(int frequency)
     srv_reconf_req_.config.doubles[4].name = "vr_pitch_offset";
     srv_reconf_req_.config.doubles[5].name = "vr_roll_offset";
     
-    // Set the planning parameters of the move group (MoveIt!)
+    // Set planning parameters of the MoveIt! move group
     move_group_.setPoseReferenceFrame("floor_base");
     move_group_.setMaxVelocityScalingFactor(0.05);
-
-    ROS_INFO_STREAM(kinematic_model_->getModelFrame().c_str() );
-
-    // std::vector<double> joint_values;
-    // const std::vector<std::string>& joint_names = joint_model_group_->getVariableNames();
-    // kinematic_state_->copyJointGroupPositions(joint_model_group_, joint_values);
-    // for (std::size_t i = 0; i < joint_names.size(); ++i)
-    // {
-    // ROS_INFO("Joint %s: %f", joint_names[i].c_str(), joint_values[i]);
-    // }
+    move_group_.setMaxAccelerationScalingFactor(0.05);
 }
 CalibratingNode::~CalibratingNode() {
 }
@@ -91,21 +86,21 @@ bool CalibratingNode::Init() {
     // }
 
     // Wait for action server
-    ROS_INFO("Waiting for action server...");
+    ROS_INFO("Waiting for FollowJointTrajectory action server...");
     action_client_->waitForServer();
-    ROS_INFO("Action server ready");
+    ROS_INFO("FollowJointTrajectory action server ready!");
 
+    // Initialize test transform
     tf_X_.setOrigin(tf2::Vector3(2., -1., 0.5) );
     tf_X_.setRotation(tf2::Quaternion(0., 0., std::sin(M_PI_4), std::cos(M_PI_4) ) );
 
+    // Initialize transform frame ids
     tf_msg_pose_.header.frame_id = "floor_base";
     tf_msg_pose_.child_frame_id = "desired_pose";
     pose_msg_.header.frame_id = "floor_base";
 
     MeasureRobot(10);
-    return false;
-    
-    // return true;
+    return true;
 }
 
 void CalibratingNode::Loop() {
@@ -123,6 +118,7 @@ void CalibratingNode::Shutdown() {
 
     
 }
+
 
 void CalibratingNode::JoyCb(const sensor_msgs::Joy& msg_) {
       /**
@@ -183,9 +179,27 @@ geometry_msgs::Pose CalibratingNode::GenerateRandomPose(geometry_msgs::Pose &pos
     return pose_;
 }
 
+
+void GenerateJointTrajectorySine(trajectory_msgs::JointTrajectory traj_msg_, std::vector<double> positions0,
+                                 int joint, int sampling_frequency, double amplitude, double frequency, int periods)
+{
+    traj_msg_.points.resize(int(sampling_frequency/frequency*periods) );
+
+    for (int i = 0; i < sampling_frequency/frequency*periods; i++) {
+        traj_msg_.points[i].positions = positions0;
+        traj_msg_.points[i].positions[joint] += std::sin(frequency/10*i);
+
+        traj_msg_.points[i].velocities = {0., 0., 0., 0., 0., 0.};
+        traj_msg_.points[i].velocities[joint] += frequency*std::cos(frequency/10*i);
+
+        traj_msg_.points[i].accelerations = {0., 0., 0., 0., 0., 0.};
+        traj_msg_.points[i].accelerations[joint] += -frequency*frequency*std::sin(frequency/10*i);
+    }
+}
+
 bool CalibratingNode::MoveRobot(const geometry_msgs::PoseStamped &pose_) {
      /**
-      * Move robot to provided pose, stop, and wait for the dynamics to settle down.tf_buffer_.waitForTransform("floor_tool0", "controller_frame", ros::Time(0), ros::Duration(10.) );
+      * Move robot to provided pose, stop, and wait for the dynamics to settle down.
       * Returns true if trajectory execution succeeded.
       */
     
@@ -193,7 +207,6 @@ bool CalibratingNode::MoveRobot(const geometry_msgs::PoseStamped &pose_) {
     geometry_msgs::PoseStamped pose_root_;
     tf2::doTransform(pose_, pose_root_, tf_root_);
     
-
     if (kinematic_state_->setFromIK(joint_model_group_, pose_root_.pose, 10, 0.1) ) {
         std::vector<double> joint_values;
         kinematic_state_->copyJointGroupPositions(joint_model_group_, joint_values);
@@ -228,6 +241,7 @@ bool CalibratingNode::MoveRobot(const geometry_msgs::PoseStamped &pose_) {
         ROS_INFO("Unable to find IK solution");
     }
 }
+
 void CalibratingNode::MeasureRobot(const int &N) {
      /**
       * Runs a calibration routine by moving the robot to N random poses.
@@ -301,8 +315,13 @@ void CalibratingNode::MeasureRobot(const int &N) {
                     bag_.write("A", ros::Time::now(), tf_msg_A_);
                     bag_.write("B", ros::Time::now(), tf_msg_B_);
 
-                    tf_Avec_.push_back(tf_msg_A_.transform);
-                    tf_Bvec_.push_back(tf_msg_B_.transform);
+                    // Sample pair (A, B)
+                    vive_calibrating::AddSample sample_srv;
+                    sample_srv.request.A = tf_msg_A_;
+                    sample_srv.request.B = tf_msg_B_;
+                    if (sample_client.call(sample_srv) ) {
+                        ROS_INFO_STREAM("Sampled " << sample_srv.response.n << " pairs (A, B)");
+                    }
 
                     // Set current pose as reference for next pose
                     tf_tool0_[0]  = tf_tool0_[1];
@@ -316,114 +335,18 @@ void CalibratingNode::MeasureRobot(const int &N) {
         ROS_WARN_STREAM("0/" << N << ": " << pError);
     }
 
-    geometry_msgs::TransformStamped tf_msg_Tx_ = ParkMartin(tf_Avec_.data(),
-                                                            tf_Bvec_.data(),
-                                                            tf_Avec_.size() );
-    ROS_INFO_STREAM(tf_msg_Tx_);
-    bag_.write("X", ros::Time::now(), tf_msg_Tx_);
+    vive_calibrating::ComputeCalibration compute_srv;
+    if (compute_client.call(compute_srv) ) {
+        if (compute_srv.response.success) {
+            geometry_msgs::TransformStamped tf_msg_Tx_ = compute_srv.response.X;
+            ROS_INFO_STREAM(tf_msg_Tx_);
+            bag_.write("X", ros::Time::now(), tf_msg_Tx_);
+        } else {
+            ROS_ERROR("Failed solving the provided AX=XB problem");
+        }
+    }
 
-    // ConstructTMatrix(tf_Avec_.data(), tf_Bvec_.data(), tf_Avec_.size() );
     bag_.close();
-}
-
-Eigen::Vector3d CalibratingNode::RotationMatrixLogarithm(const Eigen::Matrix3d &rotmat_) {
-     /**
-      * Compute the logarithm of a 3x3 rotation matrix
-      */
-
-    // Check if logarithm is uniquely defined
-    if (rotmat_.trace() != -1.) {
-        // Axis-angle magnitude
-        const double theta = std::acos((rotmat_.trace() - 1.) / 2.);
-        return theta / (2. * sin(theta) ) * Eigen::Vector3d(rotmat_(2,1) - rotmat_(1,2),
-                                                            rotmat_(0,2) - rotmat_(2,0),
-                                                            rotmat_(1,0) - rotmat_(0,1) );
-    } else {
-        ROS_ERROR_STREAM("Error occurred when computing logarithm of rotation matrix:" << std::endl <<
-                         rotmat_.matrix() << std::endl <<
-                         "This rotation matrix has a trace equal to: " << rotmat_.trace() <<
-                         ", and therefore results in a logarithm that is not uniquely defined.");
-
-        return Eigen::Vector3d::Constant(0.);
-    }
-}
-
-geometry_msgs::TransformStamped CalibratingNode::ParkMartin(const geometry_msgs::Transform tf_Ta_[],
-                                                            const geometry_msgs::Transform tf_Tb_[],
-                                                            const int &size)
-{
-     /**
-      * Solves Ta * Tx = Tx * Tb based on a closed-form least squares solution from:
-      * Robot sensor calibration: solving AX=XB on the Euclidean group
-      * https://ieeexplore.ieee.org/document/326576/
-      * 
-      * "The equation AX = XB on the Euclidean group, where A and
-      *  B are known and X is unknown, is of fundamental importance in the
-      *  problem of calibrating wrist-mounted robotic sensors."
-      * 
-      * A helpful illustration of this problem is found at:
-      * https://torsteinmyhre.name/snippets/robcam_calibration.html
-      * 
-      * Input:
-      * Ta - TF message array of tool0 poses
-      * Tb - TF message array of sensor poses
-      * size - Size of both arrays (should be the same)
-      * 
-      * Output:
-      * Tx - Transformation between end effector and sensor (solution)
-      */
-
-    Eigen::Matrix3d eigen_Ra_[size], eigen_Rb_[size];
-    Eigen::Vector3d eigen_ta_[size], eigen_tb_[size];
-
-    Eigen::MatrixXd eigen_C_(3 * size, 3);
-    Eigen::VectorXd eigen_d_(3 * size, 1);
-    eigen_M_.setZero();
-    eigen_C_.setZero();
-    eigen_d_.setZero();
-
-    for (int i = 0; i < size; i++) {
-        // Convert tf msgs to Eigen's 4x4 transform matrices (OpenGL)
-        eigen_Ta_ = tf2::transformToEigen(tf_Ta_[i]);
-        eigen_Tb_ = tf2::transformToEigen(tf_Tb_[i]);
-        // Get rotation matrices from transforms
-        eigen_Ra_[i] = eigen_Ta_.matrix().block<3, 3>(0, 0);
-        eigen_Rb_[i] = eigen_Tb_.matrix().block<3, 3>(0, 0);
-        // Get translation vectors from transforms
-        eigen_ta_[i] = eigen_Ta_.matrix().col(3).head<3>();
-        eigen_tb_[i] = eigen_Tb_.matrix().col(3).head<3>();
-
-        eigen_M_ += RotationMatrixLogarithm(eigen_Rb_[i]) *
-                    RotationMatrixLogarithm(eigen_Ra_[i]).transpose();
-    }
-
-    if (size == 2) {
-        eigen_M_ += RotationMatrixLogarithm(eigen_Rb_[1]).cross(RotationMatrixLogarithm(eigen_Rb_[0]) ) *
-                    RotationMatrixLogarithm(eigen_Ra_[1]).cross(RotationMatrixLogarithm(eigen_Ra_[0]) ).transpose();
-    }
-
-    // Compute the optimal rotation matrix R_x = (M^T * M)^(-1/2) * M^T with SVD
-    Eigen::JacobiSVD<Eigen::Matrix3d> svd_(eigen_M_.transpose() * eigen_M_,
-                                           Eigen::ComputeFullU | Eigen::ComputeFullV);
-    eigen_Rx_ = svd_.matrixU() *
-                ((((svd_.singularValues() ).cwiseSqrt() ).cwiseInverse() ).asDiagonal() ).toDenseMatrix() *
-                svd_.matrixV().transpose() *
-                eigen_M_.transpose();
-
-    for (int i = 0; i < size; i++) {
-        eigen_C_.block<3, 3>(3*i, 0) = Eigen::Matrix3d::Identity() - eigen_Ra_[i];
-        eigen_d_.segment(3*i, 3) = eigen_ta_[i] - eigen_Rx_ * eigen_tb_[i];
-    }
-    // Compute the optimal translation vector t_x = C^T / (C^T * C) * d
-    eigen_tx_ = (eigen_C_.transpose() * eigen_C_).inverse() * eigen_C_.transpose() * eigen_d_;
-
-    // Create and return the resulting 4x4 transform as geometry_msgs::TransformStamped
-    Eigen::Affine3d eigen_Tx_;
-    eigen_Tx_.matrix().block<3, 3>(0, 0) = eigen_Rx_;
-    eigen_Tx_.matrix().col(3).head<3>()  = eigen_tx_;
-
-    ROS_INFO_STREAM(std::endl << eigen_Tx_.matrix() );
-    return tf2::eigenToTransform(eigen_Tx_);
 }
 
 void CalibratingNode::ParkMartinExample() {
@@ -446,138 +369,29 @@ void CalibratingNode::ParkMartinExample() {
     tf2::convert(tf_B1_, tf_msg_B_[0]);
     tf2::convert(tf_B2_, tf_msg_B_[1]);
 
-    //ParkMartin(tf_msg_A_, tf_msg_B_, 2);
-    ConstructTMatrix(tf_msg_A_, tf_msg_B_, 2);
-}
-
-
-void CalibratingNode::TransformToDualQuaternion(const geometry_msgs::Transform &tf_msg_,
-                                                Eigen::Quaterniond &eigen_qr_,
-                                                Eigen::Quaterniond &eigen_qd_)
-{
-     /**
-      * Compute the screw representation of a transform as a dual quaternion.
-      * 
-      * qr - real quaternion (rotation)
-      * qd - dual quaternion (translation)
-      */
-    
-    // The real quaternion is simply the rotation part of the transform
-    tf2::fromMsg(tf_msg_.rotation, eigen_qr_);
-
-    Eigen::Vector3d eigen_t_;
-    tf2::fromMsg(tf_msg_.translation, eigen_t_);
-
-    eigen_qd_.w() = -0.5*(eigen_qr_.vec() ).transpose()*eigen_t_;
-    eigen_qd_.vec() = 0.5*(eigen_qr_.w()*eigen_t_ + eigen_t_.cross(eigen_qr_.vec() ) );
-}
-
-Eigen::Matrix3d CalibratingNode::AntisymmetricMatrix(const Eigen::Vector3d &eigen_v_) {
-     /**
-      * Compute the antisymmetric matrix corresponding to the 
-      * cross-product with the provided vector.
-      */
-    
-    Eigen::Matrix3d eigen_asmat_;
-    eigen_asmat_ <<             0 , -eigen_v_(2),  eigen_v_(1),
-                     eigen_v_(2),             0 , -eigen_v_(0),
-                    -eigen_v_(1),  eigen_v_(0),             0 ;
-    
-    return eigen_asmat_;
-}
-
-Eigen::Matrix<double, 6, 8> CalibratingNode::ConstructSMatrix(const Eigen::Quaterniond &eigen_qrA_,
-                                                              const Eigen::Quaterniond &eigen_qdA_,
-                                                              const Eigen::Quaterniond &eigen_qrB_,
-                                                              const Eigen::Quaterniond &eigen_qdB_)
-{
-     /**
-      * Construct a 6x8 matrix corresponding to a single instance 
-      * of the hand-eye calibration problem with dual quaternions.
-      * 
-      * The S matrix is given by equation 31 in Daniilidis (1999):
-      * Hand-Eye Calibration Using Dual Quaternions
-      */
-    
-    Eigen::Matrix<double, 3, 4> eigen_Sdiag_;
-    eigen_Sdiag_ << eigen_qrA_.vec() - eigen_qrB_.vec(),
-                    AntisymmetricMatrix(eigen_qrA_.vec() + eigen_qrB_.vec() );
-    
-    Eigen::Matrix<double, 6, 8> eigen_S_;
-    eigen_S_ << eigen_Sdiag_, Eigen::Matrix<double, 3, 4>::Constant(0.),
-                eigen_qdA_.vec() - eigen_qdB_.vec(),
-                AntisymmetricMatrix(eigen_qdA_.vec() + eigen_qdB_.vec() ),
-                eigen_Sdiag_;
-    
-    return eigen_S_;
-}
-
-Eigen::MatrixXd CalibratingNode::ConstructTMatrix(const geometry_msgs::Transform tf_Ta_[],
-                                                  const geometry_msgs::Transform tf_Tb_[],
-                                                  const int &size)
-{
-     /**
-      * Construct a 6*nx8 matrix T corresponding to the complete
-      * hand-eye calibration problem with dual quaternions.
-      * 
-      * The T matrix is given as equation 33 in Daniilidis (1999):
-      * Hand-Eye Calibration Using Dual Quaternions
-      */
-    
-    Eigen::Quaterniond eigen_qrA_, eigen_qdA_, eigen_qrB_, eigen_qdB_;
-    Eigen::MatrixXd eigen_T_(6*size, 8);
-
-    for (int i = 0; i < size; i++) {
-        TransformToDualQuaternion(tf_Ta_[i], eigen_qrA_, eigen_qdA_);
-        TransformToDualQuaternion(tf_Tb_[i], eigen_qrB_, eigen_qdB_);
-
-        eigen_T_.block<6, 8>(6*i, 0) = ConstructSMatrix(eigen_qrA_, eigen_qdA_,
-                                                        eigen_qrB_, eigen_qdB_);
+    vive_calibrating::AddSample sample_srv;
+    sample_srv.request.A.transform = tf_msg_A_[0];
+    sample_srv.request.B.transform = tf_msg_B_[0];
+    if (sample_client.call(sample_srv) ) {
+        ROS_INFO_STREAM("Sampled " << sample_srv.response.n << " pairs (A, B)");
+    }
+    sample_srv.request.A.transform = tf_msg_A_[1];
+    sample_srv.request.B.transform = tf_msg_B_[1];
+    if (sample_client.call(sample_srv) ) {
+        ROS_INFO_STREAM("Sampled " << sample_srv.response.n << " pairs (A, B)");
     }
 
-    Eigen::JacobiSVD<Eigen::MatrixXd> svd_(eigen_T_, Eigen::ComputeFullU | Eigen::ComputeFullV);
-    Eigen::Vector4d eigen_u_[2] = {svd_.matrixV().matrix().block<4, 1>(0, 6),
-                                   svd_.matrixV().matrix().block<4, 1>(0, 7) };
-    Eigen::Vector4d eigen_v_[2] = {svd_.matrixV().matrix().block<4, 1>(4, 6),
-                                   svd_.matrixV().matrix().block<4, 1>(4, 7) };
-
-    ROS_INFO_STREAM(svd_.singularValues() );
-
-    double a = eigen_u_[0].dot(eigen_v_[0]);
-    double b = eigen_u_[0].dot(eigen_v_[1]) + eigen_u_[1].dot(eigen_v_[0]);
-    double c = eigen_u_[1].dot(eigen_v_[1]);
-
-    double s[2] = {(-b + std::sqrt(b*b - 4*a*c) )/(2*a),
-                   (-b - std::sqrt(b*b - 4*a*c) )/(2*a) };
-
-    a = eigen_u_[0].dot(eigen_u_[0]);
-    b = 2*eigen_u_[0].dot(eigen_u_[1]);
-    c = eigen_u_[1].dot(eigen_u_[1]);
-
-    double d[2] = {s[0]*s[0]*a + 2*b*s[0] + c,
-                   s[1]*s[1]*a + 2*b*s[1] + c};
-    
-    double lambda[2];
-    // Pick solution s corresponding to the smallest lambda value
-    if (d[0] >= d[1]) {
-        lambda[1] = 1/std::sqrt(d[0]);
-        lambda[0] = s[0]*lambda[1];
-    } else {
-        lambda[1] = 1/std::sqrt(d[1]);
-        lambda[0] = s[1]*lambda[1];
+    vive_calibrating::ComputeCalibration compute_srv;
+    if (compute_client.call(compute_srv) ) {
+        if (compute_srv.response.success) {
+            geometry_msgs::TransformStamped tf_msg_Tx_ = compute_srv.response.X;
+            ROS_INFO_STREAM(tf_msg_Tx_);
+        } else {
+            ROS_ERROR("Failed solving the provided AX=XB problem");
+        }
     }
-
-    Eigen::Quaterniond eigen_qrX_(lambda[0]*eigen_u_[0] + lambda[1]*eigen_u_[1]);
-    eigen_qrX_.normalize();
-
-    Eigen::Matrix3d eigen_rotmat_;
-    eigen_rotmat_ << 0, 1, 0, 0, 0, 1, -1, 0, 0; 
-
-    Eigen::Quaterniond eigen_qdX_(lambda[0]*eigen_v_[0] + lambda[1]*eigen_v_[1]);
-    Eigen::Vector3d eigen_t_ = 2.*(eigen_qdX_*eigen_qrX_.conjugate() ).vec();
-
-    ROS_INFO_STREAM(std::endl << eigen_qrX_.toRotationMatrix()*eigen_rotmat_ << std::endl << eigen_rotmat_*eigen_t_);
 }
+
 
 int main(int argc, char** argv) {
     ros::init(argc, argv, "vive_robot_calibrating_node");
@@ -591,9 +405,9 @@ int main(int argc, char** argv) {
         exit(EXIT_FAILURE);
     }
 
-    while (ros::ok() ) {
-        node_.Loop();
-    }
+    // while (ros::ok() ) {
+    //     node_.Loop();
+    // }
 
     node_.Shutdown();
     exit(EXIT_SUCCESS);

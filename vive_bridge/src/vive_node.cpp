@@ -125,13 +125,9 @@ bool ViveNode::PublishMeshes() {
                                            devices_msg_.device_frames[i]);
                 break;
         }
-    bag_.open("calib_data_" + boost::posix_time::to_iso_string(ros::Time::now().toBoost() ) + ".bag",
-              rosbag::bagmode::Write);
     }
 
-    retur
-    bag_.open("calib_data_" + boost::posix_time::to_iso_string(ros::Time::now().toBoost() ) + ".bag",
-              rosbag::bagmode::Write);
+    return true;
 }
 
 ViveNode::~ViveNode() {

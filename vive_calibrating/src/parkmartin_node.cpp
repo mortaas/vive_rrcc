@@ -1,58 +1,4 @@
-// ROS
-#include <ros/ros.h>
-
-// ROS msgs
-#include <geometry_msgs/PoseStamped.h>
-// Service msgs
-#include <vive_calibrating/AddSample.h>
-#include <vive_calibrating/ComputeCalibration.h>
-
-// tf2
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
-#include <tf2_eigen/tf2_eigen.h>
-
-// Eigen
-#include <Eigen/Geometry>
-#include <Eigen/SVD>
-
-
-class ParkMartinNode {
-    ros::NodeHandle nh_;
-    ros::Rate loop_rate_;
-
-    // Service
-    ros::ServiceServer sample_service_, compute_service_;
-
-    // tf2
-    geometry_msgs::TransformStamped tf_X_;
-
-    // Eigen
-    std::vector<Eigen::Matrix3d> eigen_Ra_, eigen_Rb_;
-    std::vector<Eigen::Vector3d> eigen_ta_, eigen_tb_;
-
-    // Temporary matrices for solving the calibration problem
-    Eigen::Affine3d eigen_Ta_, eigen_Tb_;
-    Eigen::Matrix3d eigen_Rx_, eigen_M_;
-    Eigen::Vector3d eigen_tx_;
-
-    int n_samples;
-    
-    bool AddSample(vive_calibrating::AddSample::Request  &req,
-                   vive_calibrating::AddSample::Response &res);
-    bool ComputeCalibration(vive_calibrating::ComputeCalibration::Request  &req,
-                            vive_calibrating::ComputeCalibration::Response &res);
-
-    Eigen::Vector3d RotationMatrixLogarithm(const Eigen::Matrix3d &rotmat_);
-    bool ParkMartin();
-
-    public:
-        ParkMartinNode(int frequency);
-        ~ParkMartinNode();
-
-        bool Init();
-        void Loop();
-        void Shutdown();
-};
+#include "parkmartin_node.h"
 
 ParkMartinNode::ParkMartinNode(int frequency)
     : loop_rate_(frequency)
@@ -128,8 +74,15 @@ bool ParkMartinNode::ComputeCalibration(vive_calibrating::ComputeCalibration::Re
      */
 
     if (n_samples >= 2) {
-        // Compute the transformation from wrist to sensor
+        // Solve AX=XB for transformation X from wrist to sensor
         ParkMartin();
+
+        // Clean up
+        n_samples = 0;
+        eigen_Ra_.clear();
+        eigen_Rb_.clear();
+        eigen_ta_.clear();
+        eigen_tb_.clear();
 
         res.success = true;
         res.X = tf_X_;
@@ -173,7 +126,7 @@ bool ParkMartinNode::ParkMartin()
       *  problem of calibrating wrist-mounted robotic sensors."
       * 
       * Input:
-      * n_samples - Number of sampled pairs (A, B)
+      * n_samples - sampled pairs (A, B)
       * 
       * Output:
       * Tx - Transformation between end effector and sensor (solution)
@@ -218,6 +171,46 @@ bool ParkMartinNode::ParkMartin()
     ROS_INFO_STREAM(std::endl << eigen_Tx_.matrix() );
     tf_X_ = tf2::eigenToTransform(eigen_Tx_);
     tf_X_.header.stamp = ros::Time::now();
+}
+
+void ParkMartinNode::ParkMartinExample() {
+      /**
+     * Test method for solving AX = BX with example from report:
+     * Robot sensor calibration: solving AX=XB on the Euclidean group
+     * https://ieeexplore.ieee.org/document/326576/
+     * This method is intended to run as a one-shot test
+     * (that is, by itself and not multiple times).
+     */
+
+    // Define homogenous transformation matrices from example in report
+    tf2::Transform tf_A1_(tf2::Matrix3x3(-0.989992, -0.141120, 0., 0.141120, -0.989992, 0., 0., 0., 1.), tf2::Vector3(0., 0., 0.) );
+    tf2::Transform tf_A2_(tf2::Matrix3x3(0.070737, 0., 0.997495, 0., 1., 0., -0.997495, 0., 0.070737), tf2::Vector3(-400., 0., 400.) );
+    tf2::Transform tf_B1_(tf2::Matrix3x3(-0.989992, -0.138307, 0.028036,  0.138307, -0.911449,  0.387470, -0.028036,  0.387470, 0.921456), tf2::Vector3(- 26.9559, -96.1332,  19.4872) );
+    tf2::Transform tf_B2_(tf2::Matrix3x3( 0.070737,  0.198172, 0.997612, -0.198172,  0.963323, -0.180936, -0.977612, -0.180936, 0.107415), tf2::Vector3(-309.5430,  59.0244, 291.1770) );
+
+    geometry_msgs::Transform tf_msg_A_[2];
+    tf2::convert(tf_A1_, tf_msg_A_[0]);
+    tf2::convert(tf_A2_, tf_msg_A_[1]);
+    geometry_msgs::Transform tf_msg_B_[2];
+    tf2::convert(tf_B1_, tf_msg_B_[0]);
+    tf2::convert(tf_B2_, tf_msg_B_[1]);
+
+    for (int i = 0; i < 2; i++) {
+        // Convert tf msgs to Eigen's 4x4 transform matrices (OpenGL)
+        eigen_Ta_ = tf2::transformToEigen(tf_msg_A_[i]);
+        eigen_Tb_ = tf2::transformToEigen(tf_msg_B_[i]);
+        // Get rotation matrices from transforms
+        eigen_Ra_.push_back(eigen_Ta_.matrix().block<3, 3>(0, 0) );
+        eigen_Rb_.push_back(eigen_Tb_.matrix().block<3, 3>(0, 0) );
+        // Get translation vectors from transforms
+        eigen_ta_.push_back(eigen_Ta_.matrix().col(3).head<3>() );
+        eigen_tb_.push_back(eigen_Tb_.matrix().col(3).head<3>() );
+    }
+
+    // Solve AX=XB for transformation X from wrist to sensor
+    ParkMartin();
+
+    ROS_INFO_STREAM(tf_X_);
 }
 
 
