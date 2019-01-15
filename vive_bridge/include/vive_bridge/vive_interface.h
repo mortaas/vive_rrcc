@@ -47,6 +47,7 @@ class ViveInterface {
         void GetDeviceSN(const int &device_index, std::string &device_sn);
         void GetDeviceVelocity(const int &device_index, float linear[3], float angular[3]);
         bool PollNextEvent(int &event_type, int &device_index);
+        void TriggerHapticPulse(const int &device_index, const int &axis_id, int duration);
 
         // ROS logging
         void SetDebugMsgCallback(DebugMsgCallback fn);

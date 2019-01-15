@@ -209,6 +209,20 @@ void ViveInterface::Update() {
     pHMD_->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseRawAndUncalibrated, 0, device_poses_, vr::k_unMaxTrackedDeviceCount);
 }
 
+void ViveInterface::TriggerHapticPulse(const int &device_index, const int &axis_id, int duration) {
+    /*
+    * Triggers a single haptic pulse on a controller given its device index, and the pulse duration 0-3999 µs ("strength")
+    */
+
+    if (GetDeviceClass(device_index) == vr::TrackedDeviceClass_Controller) {
+        // 
+        duration = std::min(duration, 3999);
+        duration = std::max(duration, 0);
+
+        pHMD_->TriggerHapticPulse(device_index, axis_id, duration);
+    }
+}
+
 // Logging to ROS
 void ViveInterface::SetDebugMsgCallback(DebugMsgCallback fn) { VR_DEBUG = fn; }
 void ViveInterface::SetInfoMsgCallback(InfoMsgCallback fn) { VR_INFO = fn; }

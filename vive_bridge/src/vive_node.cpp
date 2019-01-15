@@ -25,6 +25,8 @@ ViveNode::ViveNode(int frequency)
     // Publisher and service for info about tracked devices
     devices_pub_ = nh_.advertise<vive_bridge::TrackedDevicesStamped>("tracked_devices", 10, true);
     devices_service_ = nh_.advertiseService("tracked_devices", &ViveNode::ReturnTrackedDevices, this);
+
+    joy_feedback_sub_ = nh_.subscribe("haptic_feedback", 10, &ViveNode::HapticFeedbackCallback, this);
 }
 
 int ViveNode::FindEmulatedNumpadState(float x, float y) {
@@ -57,6 +59,16 @@ int ViveNode::FindEmulatedNumpadState(float x, float y) {
         } else {
             return 5;
         }
+    }
+}
+
+void ViveNode::HapticFeedbackCallback(const sensor_msgs::JoyFeedback &msg_) {
+     /**
+      * Callback for triggering haptic feedback on a VIVE controller
+      */
+    
+    if (msg_.type == msg_.TYPE_RUMBLE) {
+        vr_.TriggerHapticPulse(msg_.id, 0, msg_.intensity);
     }
 }
 
@@ -363,9 +375,6 @@ void ViveNode::Loop() {
         {
             UpdateTrackedDevices();
             PublishTrackedDevices();
-        }
-
-        if (event_type == vr::VREvent_TrackedDeviceUpdated) {
             PublishMeshes();
         }
 

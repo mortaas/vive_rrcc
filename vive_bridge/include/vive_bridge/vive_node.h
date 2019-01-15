@@ -68,6 +68,10 @@ class ViveNode {
     std::map<std::string, ros::Publisher> twist_pubs_map_;
     std::map<std::string, ros::Publisher> joy_pubs_map_;
 
+    // Subscribers
+    ros::Subscriber joy_feedback_sub_;
+    void HapticFeedbackCallback(const sensor_msgs::JoyFeedback &msg_);
+
     // Services
     ros::ServiceServer devices_service_;
     bool ReturnTrackedDevices(vive_bridge::GetTrackedDevicesRequest &req,
