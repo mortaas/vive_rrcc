@@ -14,6 +14,8 @@
 // Eigen
 #include <Eigen/Geometry>
 #include <Eigen/SVD>
+// Sophus - C++ implementation of Lie Groups using Eigen
+#include <sophus/se3.hpp>
 
 
 class ParkMartinNode {

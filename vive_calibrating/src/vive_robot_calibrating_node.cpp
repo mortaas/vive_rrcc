@@ -3,6 +3,7 @@
 CalibratingNode::CalibratingNode(int frequency)
     : loop_rate_(frequency),
       tf_listener_(new tf2_ros::TransformListener(tf_buffer_) ),
+      // MoveIt!
       move_group_(moveit::planning_interface::MoveGroupInterface(PLANNING_GROUP) ),
       robot_model_loader_(robot_model_loader::RobotModelLoader("/robot_description") ),
       kinematic_model_(robot_model_loader_.getModel() ),
@@ -10,10 +11,14 @@ CalibratingNode::CalibratingNode(int frequency)
       joint_model_group_(kinematic_model_->getJointModelGroup("floor_manipulator") ),
       action_client_(new actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction>
                     ("/floor/joint_trajectory_action", true) ),
-      rng(random_seed() ),
+      // RNG
+      rng1(random_seed1() ),
+      rng2(random_seed2() ),
       r_dist(1.2, 1.4),
-      theta_dist(5. * M_PI_4, 7. * M_PI_4),
-      phi_dist(M_PI_4, 1.5*M_PI_4)
+      theta_dist1(5.5 * M_PI_4, 6.5 * M_PI_4),
+      phi_dist1(0.75 * M_PI_4, 1.25 * M_PI_4),
+      theta_dist2(5. * M_PI_4, 7. * M_PI_4),
+      phi_dist2(1. * M_PI_4, 3. * M_PI_4)
 {
     // Subscribers
     device_sub_ = nh_.subscribe("/vive_node/tracked_devices", 1, &CalibratingNode::DevicesCb, this);
@@ -33,8 +38,7 @@ CalibratingNode::CalibratingNode(int frequency)
     
     // Set planning parameters of the MoveIt! move group
     move_group_.setPoseReferenceFrame("floor_base");
-    move_group_.setMaxVelocityScalingFactor(0.05);
-    move_group_.setMaxAccelerationScalingFactor(0.05);
+    // move_group_.setMaxVelocityScalingFactor(0.05);
 }
 CalibratingNode::~CalibratingNode() {
 }
@@ -170,8 +174,8 @@ geometry_msgs::Pose CalibratingNode::GenerateRandomPose(geometry_msgs::Pose &pos
       */
 
     geometry_msgs::Pose pose_pos_;
-    SphereNormalPose(r_dist(rng), theta_dist(rng), phi_dist(rng), pose_pos_ );
-    SphereNormalPose(r_dist(rng), theta_dist(rng), phi_dist(rng), pose_ );
+    SphereNormalPose(r_dist(rng1), theta_dist1(rng1), phi_dist1(rng1), pose_pos_ );
+    SphereNormalPose(r_dist(rng2), theta_dist2(rng2), phi_dist2(rng2), pose_ );
     
     // Set position from the first random pose
     pose_.position = pose_pos_.position;
@@ -180,30 +184,31 @@ geometry_msgs::Pose CalibratingNode::GenerateRandomPose(geometry_msgs::Pose &pos
 }
 
 
-void GenerateJointTrajectorySine(trajectory_msgs::JointTrajectory traj_msg_, std::vector<double> positions0,
-                                 int joint, int sampling_frequency, double amplitude, double frequency, int periods)
-{
-    traj_msg_.points.resize(int(sampling_frequency/frequency*periods) );
+// void GenerateJointTrajectorySine(trajectory_msgs::JointTrajectory traj_msg_, std::vector<double> positions0,
+//                                  int joint, int sampling_frequency, double amplitude, double frequency, int periods)
+// {
+//     traj_msg_.points.resize(int(sampling_frequency/frequency*periods) );
 
-    for (int i = 0; i < sampling_frequency/frequency*periods; i++) {
-        traj_msg_.points[i].positions = positions0;
-        traj_msg_.points[i].positions[joint] += std::sin(frequency/10*i);
+//     for (int i = 0; i < sampling_frequency/frequency*periods; i++) {
+//         traj_msg_.points[i].positions = positions0;
+//         traj_msg_.points[i].positions[joint] += std::sin(frequency/10*i);
 
-        traj_msg_.points[i].velocities = {0., 0., 0., 0., 0., 0.};
-        traj_msg_.points[i].velocities[joint] += frequency*std::cos(frequency/10*i);
+//         traj_msg_.points[i].velocities = {0., 0., 0., 0., 0., 0.};
+//         traj_msg_.points[i].velocities[joint] += frequency*std::cos(frequency/10*i);
 
-        traj_msg_.points[i].accelerations = {0., 0., 0., 0., 0., 0.};
-        traj_msg_.points[i].accelerations[joint] += -frequency*frequency*std::sin(frequency/10*i);
-    }
-}
+//         traj_msg_.points[i].accelerations = {0., 0., 0., 0., 0., 0.};
+//         traj_msg_.points[i].accelerations[joint] += -frequency*frequency*std::sin(frequency/10*i);
+//     }
+// }
 
-bool CalibratingNode::GetJointPositionsFromIK(const geometry_msgs::PoseStamped &pose_, std::vector<double> joint_values) {
-    geometry_msgs::TransformStamped tf_root_ = tf_buffer_.lookupTransform("root", pose_.header.frame_id, ros::Time(0) );
-    geometry_msgs::PoseStamped pose_root_;
-    tf2::doTransform(pose_, pose_root_, tf_root_);
+// bool CalibratingNode::GetJointPositionsFromIK(const geometry_msgs::PoseStamped &pose_, std::vector<double> joint_values) {
+//     geometry_msgs::TransformStamped tf_root_ = tf_buffer_.lookupTransform("root", pose_.header.frame_id, ros::Time(0) );
+//     geometry_msgs::PoseStamped pose_root_;
+//     tf2::doTransform(pose_, pose_root_, tf_root_);
 
     
-}
+// }
+
 
 bool CalibratingNode::MoveRobot(const geometry_msgs::PoseStamped &pose_) {
      /**
@@ -246,7 +251,7 @@ bool CalibratingNode::MoveRobot(const geometry_msgs::PoseStamped &pose_) {
         //     return false;
         // }
     } else {
-        ROS_INFO("Unable to find IK solution");
+        ROS_INFO("Unable to find a IK solution");
     }
 }
 

@@ -102,6 +102,7 @@ class CalibratingNode {
     tf2_ros::StaticTransformBroadcaster static_tf_broadcaster_;
     tf2_ros::TransformListener *tf_listener_;
 
+    // transforms
     tf2::Transform tf_tool0_[2], tf_sensor_[2];
     tf2::Transform tf_X_;
     
@@ -122,14 +123,14 @@ class CalibratingNode {
     void ParkMartinExample();
 
     // Random number generator (RNG) for generating random poses
-    std::uniform_real_distribution<double> r_dist, theta_dist, phi_dist;
-    std::random_device random_seed;
-    std::mt19937_64 rng;
+    std::uniform_real_distribution<double> r_dist, theta_dist1, phi_dist1, theta_dist2, phi_dist2;
+    std::random_device random_seed1, random_seed2;
+    std::mt19937_64 rng1, rng2;
 
     geometry_msgs::Pose SphereNormalPose(double r, double theta, double phi, geometry_msgs::Pose &pose_);
     geometry_msgs::Pose GenerateRandomPose(geometry_msgs::Pose &pose_);
 
-    bool GetJointPositionsFromIK(const geometry_msgs::PoseStamped &pose_, std::vector<double> joint_values);
+    // bool GetJointPositionsFromIK(const geometry_msgs::PoseStamped &pose_, std::vector<double> joint_values);
     
     public:
         CalibratingNode(int frequency);

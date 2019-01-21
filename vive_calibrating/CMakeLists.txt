@@ -32,6 +32,14 @@ if(NOT EIGEN3_INCLUDE_DIRS)
   set(EIGEN3_INCLUDE_DIRS ${EIGEN3_INCLUDE_DIR})
 endif()
 
+# Sophus - C++ implementation of Lie Groups using Eigen
+# find_package(catkin REQUIRED COMPONENTS
+#   ecl_linear_algebra
+#   ecl_time
+#   dslam_common
+# )
+find_package(sophus REQUIRED)
+
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -120,9 +128,10 @@ generate_messages(
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES vive_calibrating
-#  CATKIN_DEPENDS geometry_msgs moveit_msgs roscpp shape_msgs
-   CATKIN_DEPENDS message_runtime
-#  DEPENDS system_lib
+  CATKIN_DEPENDS
+    message_runtime
+  DEPENDS
+    sophus
 )
 
 ###########
