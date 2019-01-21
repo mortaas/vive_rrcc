@@ -58,6 +58,26 @@ find_library(OPENVR_LIBRARIES
 )
 set(OPENVR_INCLUDE_DIR ${OPENVR}/headers)
 
+## Set libsurvive library path
+## ENV reads paths from a system environment variable
+set(SURVIVE "$ENV{HOME}/lib/libsurvive")
+
+## OpenVR SDK path
+find_library(SURVIVE_LIBRARIES
+  NAMES
+    ## Specify one or more possible names for the library
+    survive
+  PATHS
+    ## Specify directories to search in addition to the default locations
+    ${SURVIVE}/lib
+  ## If NO_DEFAULT_PATH is specified, then no additional paths are added to the search
+  NO_DEFAULT_PATH
+  ## If NO_CMAKE_FIND_ROOT_PATH is used then CMAKE_FIND_ROOT_PATH will not be used
+  NO_CMAKE_FIND_ROOT_PATH
+)
+set(SURVIVE_INCLUDE_DIR ${SURVIVE}/include
+                        ${SURVIVE}/redist)
+
 ################################################
 ## Declare ROS messages, services and actions ##
 ################################################

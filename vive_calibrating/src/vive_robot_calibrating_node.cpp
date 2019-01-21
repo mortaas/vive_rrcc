@@ -18,7 +18,7 @@ CalibratingNode::CalibratingNode(int frequency)
       theta_dist1(5.5 * M_PI_4, 6.5 * M_PI_4),
       phi_dist1(0.75 * M_PI_4, 1.25 * M_PI_4),
       theta_dist2(5. * M_PI_4, 7. * M_PI_4),
-      phi_dist2(1. * M_PI_4, 3. * M_PI_4)
+      phi_dist2(1.5 * M_PI_4, 3. * M_PI_4)
 {
     // Subscribers
     device_sub_ = nh_.subscribe("/vive_node/tracked_devices", 1, &CalibratingNode::DevicesCb, this);
@@ -235,24 +235,24 @@ bool CalibratingNode::MoveRobot(const geometry_msgs::PoseStamped &pose_) {
         traj_goal_msg_.trajectory.points[0].time_from_start = ros::Duration(10.);
 
         action_client_->sendGoalAndWait(traj_goal_msg_);
-
-        // move_group_.setPoseTarget(pose_);
-
-        // if (move_group_.move() ) {
-        //     ROS_INFO_STREAM("Trajectory execution succeeded");
-
-        //     move_group_.stop();
-        //     ros::Duration(0.5).sleep();
-        //     return true;
-        // } else {
-        //     ROS_WARN_STREAM("Trajectory execution failed with pose:" << std::endl
-        //                                                             << pose_.pose);
-
-        //     return false;
-        // }
     } else {
         ROS_INFO("Unable to find a IK solution");
     }
+
+    // move_group_.setPoseTarget(pose_);
+
+    // if (move_group_.move() ) {
+    //     ROS_INFO_STREAM("Trajectory execution succeeded");
+
+    //     move_group_.stop();
+    //     ros::Duration(0.5).sleep();
+    //     return true;
+    // } else {
+    //     ROS_WARN_STREAM("Trajectory execution failed with pose:" << std::endl
+    //                                                             << pose_.pose);
+
+    //     return false;
+    // }
 }
 
 void CalibratingNode::MeasureRobot(const int &N) {
