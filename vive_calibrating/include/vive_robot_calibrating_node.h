@@ -58,6 +58,9 @@ class CalibratingNode {
     void JoyCb(const sensor_msgs::Joy& msg_);
     void DevicesCb(const vive_bridge::TrackedDevicesStamped& msg_);
 
+    // Publisher
+    ros::Publisher traj_pub_;
+
     // Service
     ros::ServiceClient sample_client, compute_client;
 
@@ -65,11 +68,12 @@ class CalibratingNode {
     actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction> *action_client_;
 
     // msgs
+    control_msgs::FollowJointTrajectoryGoal traj_goal_msg_;
     geometry_msgs::TransformStamped tf_msg_;
 
     geometry_msgs::TransformStamped tf_msg_tool0_, tf_msg_sensor_;
     geometry_msgs::TransformStamped tf_msg_A_, tf_msg_B_;
-    std::vector<geometry_msgs::Transform> tf_Avec_, tf_Bvec_;
+    // std::vector<geometry_msgs::Transform> tf_Avec_, tf_Bvec_;
     
     geometry_msgs::TransformStamped tf_msg_pose_;
     geometry_msgs::PoseStamped pose_msg_;
@@ -96,6 +100,9 @@ class CalibratingNode {
     const robot_state::JointModelGroup* joint_model_group_;
 
     bool MoveRobot(const geometry_msgs::PoseStamped &pose_);
+    std::vector<double> joint_values, joint_folded;
+
+    bool CalibrateViveNode();
 
     // tf2
     tf2_ros::Buffer tf_buffer_;
@@ -106,7 +113,7 @@ class CalibratingNode {
     tf2::Transform tf_tool0_[2], tf_sensor_[2];
     tf2::Transform tf_X_;
     
-    tf2::Transform tf_pose_;
+    tf2::Transform tf_pose_, tf_controller_;
 
     void MeasureRobot(const int &N);
 

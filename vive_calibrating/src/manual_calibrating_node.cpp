@@ -49,6 +49,7 @@ class CalibratingNode {
     void DevicesCb(const vive_bridge::TrackedDevicesStamped& msg_);
 
     bool ValidateDeviceID(std::string device_id);
+    bool CalibrateViveNode();
 
     // Service
     ros::ServiceClient sample_client, compute_client;
@@ -61,7 +62,7 @@ class CalibratingNode {
     tf2_ros::TransformListener *tf_listener_;
 
     std::string controller_frame, controller_input;
-    tf2::Transform tf_controller_, tf_controller_offset_;
+    tf2::Transform tf_controller_;
 
     geometry_msgs::TransformStamped tf_msg_tool0_, tf_msg_sensor_;
     geometry_msgs::TransformStamped tf_msg_A_, tf_msg_B_;
@@ -282,45 +283,62 @@ void CalibratingNode::JoyCb(const sensor_msgs::Joy& msg_) {
         if (n_samples > 2) {
             ROS_INFO_STREAM("Calibrate with " << n_samples << " measurements!");
 
-            vive_calibrating::ComputeCalibration compute_srv;
-            if (compute_client.call(compute_srv) ) {
-                if (compute_srv.response.success) {
-                    geometry_msgs::TransformStamped tf_msg_Tx_ = compute_srv.response.X;
-                    tf_msg_Tx_.header.frame_id = "floor_tool0";
-                    tf_msg_Tx_.child_frame_id = controller_frame;
-                    tf_msg_Tx_.header.stamp = ros::Time::now();
-                    bag_.write("X", ros::Time::now(), tf_msg_Tx_);
-                    ROS_INFO_STREAM(tf_msg_Tx_);
-
-                    tf2::fromMsg(tf_msg_Tx_.transform, tf_X_);
-
-                    // Lookup transformation from VIVE Tracker to world_vr
-                    tf_msg_ = tf_buffer_.lookupTransform("root", "floor_tool0", ros::Time(0) );
-                    tf2::fromMsg(tf_msg_.transform, tf_tool0_[1]);
-                    tf_msg_ = tf_buffer_.lookupTransform(controller_frame, "world_vr", ros::Time(0) );
-                    tf2::fromMsg(tf_msg_.transform, tf_controller_);
-
-                    tf_controller_ = tf_tool0_[1]*tf_X_*tf_controller_;
-
-                    // Set new offset parameters based on transformation
-                    srv_reconf_req_.config.doubles[0].value = tf_controller_.getOrigin().getX();
-                    srv_reconf_req_.config.doubles[1].value = tf_controller_.getOrigin().getY();
-                    srv_reconf_req_.config.doubles[2].value = tf_controller_.getOrigin().getZ();
-                    tf_controller_.getBasis().getRPY(roll_offset, pitch_offset, yaw_offset);
-                    srv_reconf_req_.config.doubles[3].value = yaw_offset;
-                    srv_reconf_req_.config.doubles[4].value = pitch_offset;
-                    srv_reconf_req_.config.doubles[5].value = roll_offset;
-                    // Send request to the dynamic reconfigure service in vive_node
-                    ros::service::call("/vive_node/set_parameters", srv_reconf_req_, srv_reconf_resp_);
-
-                    n_samples = 0;
-                } else {
-                    ROS_ERROR("Failed solving the provided AX=XB problem");
-                }
+            if (CalibrateViveNode() ) {
+                n_samples = 0;
+            } else {
+                ROS_ERROR("Failed solving the provided AX=XB problem");
             }
         }
     }
 }
+
+bool CalibratingNode::CalibrateViveNode() {
+      /**
+     * Calibrate VIVE node by calling the ParkMartin compute service,
+     * and update the VIVE node parameters using dynamic reconfigure
+     */
+
+    vive_calibrating::ComputeCalibration compute_srv;
+
+    if (compute_client.call(compute_srv) ) {
+        if (compute_srv.response.success) {
+            geometry_msgs::TransformStamped tf_msg_Tx_ = compute_srv.response.X;
+            tf_msg_Tx_.header.frame_id = "floor_tool0";
+            tf_msg_Tx_.child_frame_id = controller_frame;
+            tf_msg_Tx_.header.stamp = ros::Time::now();
+            bag_.write("X", ros::Time::now(), tf_msg_Tx_);
+            ROS_INFO_STREAM(tf_msg_Tx_);
+
+            tf2::fromMsg(tf_msg_Tx_.transform, tf_X_);
+
+            // Lookup transformation from VIVE Tracker to world_vr
+            tf_msg_ = tf_buffer_.lookupTransform("root", "floor_tool0", ros::Time(0) );
+            tf2::fromMsg(tf_msg_.transform, tf_tool0_[1]);
+            tf_msg_ = tf_buffer_.lookupTransform(controller_frame, "world_vr", ros::Time(0) );
+            tf2::fromMsg(tf_msg_.transform, tf_controller_);
+
+            tf_controller_ = tf_tool0_[1]*tf_X_*tf_controller_;
+
+            // Set new offset parameters based on transformation
+            srv_reconf_req_.config.doubles[0].value = tf_controller_.getOrigin().getX();
+            srv_reconf_req_.config.doubles[1].value = tf_controller_.getOrigin().getY();
+            srv_reconf_req_.config.doubles[2].value = tf_controller_.getOrigin().getZ();
+            tf_controller_.getBasis().getRPY(roll_offset, pitch_offset, yaw_offset);
+            srv_reconf_req_.config.doubles[3].value = yaw_offset;
+            srv_reconf_req_.config.doubles[4].value = pitch_offset;
+            srv_reconf_req_.config.doubles[5].value = roll_offset;
+            // Send request to the dynamic reconfigure service in vive_node
+            ros::service::call("/vive_node/set_parameters", srv_reconf_req_, srv_reconf_resp_);
+
+            return true;
+        } else {
+            return false;
+        }
+
+        return false;
+    }
+}
+
 
 void CalibratingNode::DevicesCb(const vive_bridge::TrackedDevicesStamped& msg_) {
       /**

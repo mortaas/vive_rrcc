@@ -206,7 +206,7 @@ void ViveInterface::Update() {
     * TrackingUniverseRawAndUncalibrated - provides poses relative to the hardware-specific coordinate system in the driver
     */
     
-    pHMD_->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseRawAndUncalibrated, 0, device_poses_, vr::k_unMaxTrackedDeviceCount);
+    pHMD_->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0, device_poses_, vr::k_unMaxTrackedDeviceCount);
 }
 
 void ViveInterface::TriggerHapticPulse(const int &device_index, const int &axis_id, int duration) {
