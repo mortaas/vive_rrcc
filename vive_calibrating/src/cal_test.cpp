@@ -51,7 +51,7 @@ bool CalibrationTestNode::Init() {
      * Initialize the node
      */
 
-    while (!tf_buffer_.canTransform("controller_test", "controller_LHR_FDBBBBC0", ros::Time(0) ) ) {
+    while (!tf_buffer_.canTransform("controller_test", "controller_LHR_FDB9BFC4", ros::Time(0) ) ) {
         ros::spinOnce();
         ros::Duration(1.0).sleep();
     }
@@ -64,7 +64,7 @@ void CalibrationTestNode::Loop() {
      * Main loop of the node
      */
 
-    tf_msg_diff_ = tf_buffer_.lookupTransform("controller_LHR_FDBBBBC0", "controller_test", ros::Time(0) );
+    tf_msg_diff_ = tf_buffer_.lookupTransform("controller_LHR_FDB9BFC4", "controller_test", ros::Time(0) );
     tf2::fromMsg(tf_msg_diff_.transform, tf_diff_);
     tf2::toMsg(tf_diff_, pose_diff_.pose);
 

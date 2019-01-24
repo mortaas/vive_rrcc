@@ -1,16 +1,17 @@
 #include "vive_robot_calibrating_node.h"
+#include "moveit_msgs/Constraints.h"
 
 CalibratingNode::CalibratingNode(int frequency)
     : loop_rate_(frequency),
       tf_listener_(new tf2_ros::TransformListener(tf_buffer_) ),
       // MoveIt!
       move_group_(moveit::planning_interface::MoveGroupInterface(PLANNING_GROUP) ),
-      robot_model_loader_(robot_model_loader::RobotModelLoader("/robot_description") ),
-      kinematic_model_(robot_model_loader_.getModel() ),
-      kinematic_state_(new robot_state::RobotState(kinematic_model_) ),
-      joint_model_group_(kinematic_model_->getJointModelGroup("floor_manipulator") ),
-      action_client_(new actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction>
-                    ("/floor/joint_trajectory_action", true) ),
+    //   robot_model_loader_(robot_model_loader::RobotModelLoader("/robot_description") ),
+    //   kinematic_model_(robot_model_loader_.getModel() ),
+    //   kinematic_state_(new robot_state::RobotState(kinematic_model_) ),
+    //   joint_model_group_(kinematic_model_->getJointModelGroup("floor_manipulator") ),
+    //   action_client_(new actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction>
+    //                 ("/floor/joint_trajectory_action", true) ),
       // RNG
       rng1(random_seed1() ),
       rng2(random_seed2() ),
@@ -41,7 +42,34 @@ CalibratingNode::CalibratingNode(int frequency)
     
     // Set planning parameters of the MoveIt! move group
     move_group_.setPoseReferenceFrame("floor_base");
-    move_group_.setMaxVelocityScalingFactor(0.5);
+    // move_group_.setMaxVelocityScalingFactor(0.5);
+
+    move_group_.clearPathConstraints();
+
+    moveit_msgs::Constraints cm_;
+
+    cm_.joint_constraints.push_back(moveit_msgs::JointConstraint() );
+    cm_.joint_constraints[0].joint_name = "floor_joint_a1";
+    cm_.joint_constraints[0].position = M_PI_2;
+    cm_.joint_constraints[0].tolerance_above = M_PI_2;
+    cm_.joint_constraints[0].tolerance_below = M_PI_2;
+    cm_.joint_constraints[0].weight = 1.;
+
+    // cm_.joint_constraints.push_back(moveit_msgs::JointConstraint() );
+    // cm_.joint_constraints[1].joint_name = "floor_joint_a3";
+    // cm_.joint_constraints[1].position = M_PI_2;
+    // cm_.joint_constraints[1].tolerance_above = M_PI_2;
+    // cm_.joint_constraints[1].tolerance_below = M_PI_2;
+    // cm_.joint_constraints[1].weight = 1.;
+
+    cm_.joint_constraints.push_back(moveit_msgs::JointConstraint() );
+    cm_.joint_constraints[1].joint_name = "floor_joint_a6";
+    cm_.joint_constraints[1].position = 0.;
+    cm_.joint_constraints[1].tolerance_above = M_PI_2;
+    cm_.joint_constraints[1].tolerance_below = M_PI_2;
+    cm_.joint_constraints[1].weight = 1.;
+
+    move_group_.setPathConstraints(cm_);
 }
 CalibratingNode::~CalibratingNode() {
 }
@@ -93,9 +121,9 @@ bool CalibratingNode::Init() {
     }
 
     // Wait for action server
-    ROS_INFO("Waiting for FollowJointTrajectory action server...");
-    action_client_->waitForServer();
-    ROS_INFO("FollowJointTrajectory action server ready!");
+    // ROS_INFO("Waiting for FollowJointTrajectory action server...");
+    // action_client_->waitForServer();
+    // ROS_INFO("FollowJointTrajectory action server ready!");
 
     // Initialize test transform
     tf_X_.setOrigin(tf2::Vector3(2., -1., 0.5) );
@@ -107,12 +135,12 @@ bool CalibratingNode::Init() {
     pose_msg_.header.frame_id = "floor_base";
 
     // Initialize FollowJointTrajectoryGoal message
-    const std::vector<std::string>& joint_names = joint_model_group_->getVariableNames();
-    traj_goal_msg_.trajectory.joint_names = joint_names;
-    traj_goal_msg_.trajectory.points.push_back(trajectory_msgs::JointTrajectoryPoint() );
-    traj_goal_msg_.trajectory.points[0].velocities = {0., 0., 0., 0., 0., 0.};
-    traj_goal_msg_.trajectory.points[0].accelerations = {0., 0., 0., 0., 0., 0.};
-    traj_goal_msg_.trajectory.points[0].time_from_start = ros::Duration(10.);
+    // const std::vector<std::string>& joint_names = joint_model_group_->getVariableNames();
+    // traj_goal_msg_.trajectory.joint_names = joint_names;
+    // traj_goal_msg_.trajectory.points.push_back(trajectory_msgs::JointTrajectoryPoint() );
+    // traj_goal_msg_.trajectory.points[0].velocities = {0., 0., 0., 0., 0., 0.};
+    // traj_goal_msg_.trajectory.points[0].accelerations = {0., 0., 0., 0., 0., 0.};
+    // traj_goal_msg_.trajectory.points[0].time_from_start = ros::Duration(10.);
 
     joint_folded = {1.5707893454778887, -2.5900040327772613, 2.3999184786133068, -2.6179938779914945e-05, 0.799936756066561, 8.377580409572782e-05};
 
@@ -273,7 +301,7 @@ bool CalibratingNode::MoveRobot(const geometry_msgs::PoseStamped &pose_) {
         ROS_INFO_STREAM("Trajectory execution succeeded");
 
         move_group_.stop();
-        ros::Duration(0.5).sleep();
+        ros::Duration(10.).sleep();
         return true;
     } else {
         ROS_WARN_STREAM("Trajectory execution failed with pose:" << std::endl
