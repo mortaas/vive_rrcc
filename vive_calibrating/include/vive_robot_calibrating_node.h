@@ -37,6 +37,8 @@
 #include <moveit/robot_model/robot_model.h>
 #include <moveit/robot_state/robot_state.h>
 
+#include "moveit_msgs/Constraints.h"
+
 // Boost
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -111,7 +113,7 @@ class CalibratingNode {
 
     // transforms
     tf2::Transform tf_tool0_[2], tf_sensor_[2];
-    tf2::Transform tf_X_;
+    tf2::Transform tf_X_, tf_X_inv_;
     
     tf2::Transform tf_pose_, tf_controller_;
 
@@ -136,6 +138,9 @@ class CalibratingNode {
 
     geometry_msgs::Pose SphereNormalPose(double r, double theta, double phi, geometry_msgs::Pose &pose_);
     geometry_msgs::Pose GenerateRandomPose(geometry_msgs::Pose &pose_);
+
+    void FillTestPoses(std::vector<geometry_msgs::PoseStamped> &poses_, std::string frame_id, double L, int n, double z);
+    void ExecutePoses(std::vector<geometry_msgs::PoseStamped> &poses_);
 
     // bool GetJointPositionsFromIK(const geometry_msgs::PoseStamped &pose_, std::vector<double> joint_values);
     

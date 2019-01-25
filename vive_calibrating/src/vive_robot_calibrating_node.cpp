@@ -1,5 +1,4 @@
 #include "vive_robot_calibrating_node.h"
-#include "moveit_msgs/Constraints.h"
 
 CalibratingNode::CalibratingNode(int frequency)
     : loop_rate_(frequency),
@@ -42,7 +41,7 @@ CalibratingNode::CalibratingNode(int frequency)
     
     // Set planning parameters of the MoveIt! move group
     move_group_.setPoseReferenceFrame("floor_base");
-    // move_group_.setMaxVelocityScalingFactor(0.5);
+    move_group_.setMaxVelocityScalingFactor(0.5);
 
     move_group_.clearPathConstraints();
 
@@ -126,8 +125,10 @@ bool CalibratingNode::Init() {
     // ROS_INFO("FollowJointTrajectory action server ready!");
 
     // Initialize test transform
-    tf_X_.setOrigin(tf2::Vector3(2., -1., 0.5) );
-    tf_X_.setRotation(tf2::Quaternion(0., 0., std::sin(M_PI_4), std::cos(M_PI_4) ) );
+    tf_X_.setOrigin(tf2::Vector3(-0.0694269, -0.0161205, 0.222943) );
+    tf_X_.setRotation(tf2::Quaternion(-0.141518, 0.711714, 0.150571, 0.67139) );
+
+    tf_X_inv_ = tf_X_.inverse();
 
     // Initialize transform frame ids
     tf_msg_pose_.header.frame_id = "floor_base";
@@ -144,7 +145,11 @@ bool CalibratingNode::Init() {
 
     joint_folded = {1.5707893454778887, -2.5900040327772613, 2.3999184786133068, -2.6179938779914945e-05, 0.799936756066561, 8.377580409572782e-05};
 
-    MeasureRobot(100);
+    std::vector<geometry_msgs::PoseStamped> test_poses_;
+    FillTestPoses(test_poses_, "floor_base", 2., 4, 1.5);
+    ExecutePoses(test_poses_);
+
+    // MeasureRobot(100);
     return true;
 }
 
@@ -188,6 +193,54 @@ void CalibratingNode::DevicesCb(const vive_bridge::TrackedDevicesStamped& msg_) 
     }
 }
 
+void CalibratingNode::FillTestPoses(std::vector<geometry_msgs::PoseStamped> &poses_, std::string frame_id, double L, int n, double z) {
+    const double h = L/n;
+    const double L_2 = L/2;
+
+    poses_.resize(n*n + n + 1);
+
+    geometry_msgs::TransformStamped tf_msg_X_inv_;
+    tf_msg_X_inv_.header.stamp = ros::Time::now();
+    tf_msg_X_inv_.header.frame_id = "controller_LHR_FDB9BFC4";
+    tf_msg_X_inv_.child_frame_id = "floor_tool0";
+    tf2::convert(tf_X_inv_, tf_msg_X_inv_.transform);
+
+    // geometry_msgs::TransformStamped tf_base_ = tf_buffer_.lookupTransform("floor_tool0", ros::Time(0), "controller_test", ros::Time(0), "floor_base");
+    // ROS_INFO_STREAM(tf_base_);
+
+    geometry_msgs::PoseStamped pose_;
+    pose_.header.stamp = ros::Time::now();
+    pose_.header.frame_id = frame_id;
+
+    for (int i = 0; i <= n; i++) {
+        for (int j = 0; j <= n; j++) {
+            pose_.pose.position.x = h*i - L_2;
+            pose_.pose.position.y = h*j - L_2;
+            pose_.pose.position.z = z;
+
+            pose_.pose.orientation.x = 1.;
+            pose_.pose.orientation.y = 0.;
+            pose_.pose.orientation.z = 0.;
+            pose_.pose.orientation.w = 0.;
+
+            // tf2::fromMsg(pose_.pose, tf_pose_);
+            // tf2::toMsg(tf_X_inv_.inverseTimes(tf_pose_), pose_.pose);
+            // T_sensor^base = T_tool0^base * T_sensor^tool0
+            // T_tool0^base = T_sensor^base * (T_sensor^tool0)^(-1)
+
+            //tf2::doTransform(pose_.pose.orientation, pose_.pose.orientation, tf_msg_X_inv_);
+            poses_[i*n + j] = pose_;
+
+            // tf2::doTransform(pose_, poses_[i*n + j], tf_base_);
+        }
+    }
+}
+
+void CalibratingNode::ExecutePoses(std::vector<geometry_msgs::PoseStamped> &poses_) {
+    for (std::vector<geometry_msgs::PoseStamped>::iterator it_ = poses_.begin(); it_ != poses_.end(); ++it_) {
+        MoveRobot(*it_);
+    }
+}
 
 geometry_msgs::Pose CalibratingNode::SphereNormalPose(double r, double theta, double phi, geometry_msgs::Pose &pose_) {
       /**
@@ -259,8 +312,7 @@ bool CalibratingNode::MoveRobot(const geometry_msgs::PoseStamped &pose_) {
     
     move_group_.setJointValueTarget(joint_folded);
 
-    // move_group_.setPoseTarget(pose_);
-
+    ROS_INFO_STREAM("Moving robot to folded goal state");
     if (move_group_.move() ) {
         ROS_INFO_STREAM("Trajectory execution succeeded");
 
@@ -268,8 +320,7 @@ bool CalibratingNode::MoveRobot(const geometry_msgs::PoseStamped &pose_) {
         ros::Duration(0.5).sleep();
         // return true;
     } else {
-        ROS_WARN_STREAM("Trajectory execution failed with pose:" << std::endl
-                                                                << pose_.pose);
+        ROS_WARN_STREAM("Trajectory execution failed");
 
         return false;
     }
@@ -295,17 +346,23 @@ bool CalibratingNode::MoveRobot(const geometry_msgs::PoseStamped &pose_) {
     //     ROS_INFO("Unable to find a IK solution");
     // }
 
+    // Visualize desired pose as a transform in RViz
+    tf2::convert(pose_.pose, tf_pose_);
+    tf2::convert(tf_pose_, tf_msg_pose_.transform);
+    tf_msg_pose_.header.stamp = ros::Time::now();
+    static_tf_broadcaster_.sendTransform(tf_msg_pose_);
+
     move_group_.setPoseTarget(pose_);
 
+    ROS_INFO_STREAM("Moving to pose: " << std::endl << pose_);
     if (move_group_.move() ) {
         ROS_INFO_STREAM("Trajectory execution succeeded");
 
         move_group_.stop();
-        ros::Duration(10.).sleep();
+        ros::Duration(3.).sleep();
         return true;
     } else {
-        ROS_WARN_STREAM("Trajectory execution failed with pose:" << std::endl
-                                                                << pose_.pose);
+        ROS_WARN_STREAM("Trajectory execution failed");
 
         return false;
     }
@@ -356,12 +413,6 @@ void CalibratingNode::MeasureRobot(const int &N) {
             GenerateRandomPose(pose_msg_.pose);
             pose_msg_.header.stamp = ros::Time::now();
             bag_.write("desired_pose", ros::Time::now(), pose_msg_);
-
-            // Visualize desired pose as a transform in RViz
-            tf2::convert(pose_msg_.pose, tf_pose_);
-            tf2::convert(tf_pose_, tf_msg_pose_.transform);
-            tf_msg_pose_.header.stamp = ros::Time::now();
-            static_tf_broadcaster_.sendTransform(tf_msg_pose_);
 
             ROS_INFO_STREAM(i << "/" << N << " Moving robot to pose:" << std::endl << pose_msg_.pose);
             if (MoveRobot(pose_msg_) ) {
