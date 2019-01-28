@@ -98,26 +98,26 @@ bool CalibratingNode::Init() {
     // ParkMartinExample();
     // return false;
 
-    if (!InitParams() ) {
-        while (controller_frame.empty() ) {
-            ROS_INFO("Waiting for available VIVE controller..");
+    // if (!InitParams() ) {
+    //     while (controller_frame.empty() ) {
+    //         ROS_INFO("Waiting for available VIVE controller..");
             
-            ros::spinOnce();
-            ros::Duration(5.0).sleep();
-        }
-    }
-    ROS_INFO_STREAM("Using " + controller_frame + " for calibration");
+    //         ros::spinOnce();
+    //         ros::Duration(5.0).sleep();
+    //     }
+    // }
+    // ROS_INFO_STREAM("Using " + controller_frame + " for calibration");
 
     // joy_sub_ = nh_.subscribe("/vive_node/joy/" + controller_frame, 1, &CalibratingNode::JoyCb, this);
 
-    std::string pError;
-    if (!tf_buffer_.canTransform("world_vr", controller_frame, ros::Time(0),
-                                 ros::Duration(5.0), &pError) )
-    {
-        ROS_ERROR_STREAM("Can't transform from world_vr to " + controller_frame + ": " + pError);
+    // std::string pError;
+    // if (!tf_buffer_.canTransform("world_vr", controller_frame, ros::Time(0),
+    //                              ros::Duration(5.0), &pError) )
+    // {
+    //     ROS_ERROR_STREAM("Can't transform from world_vr to " + controller_frame + ": " + pError);
 
-        return false;
-    }
+    //     return false;
+    // }
 
     // Wait for action server
     // ROS_INFO("Waiting for FollowJointTrajectory action server...");
@@ -146,7 +146,7 @@ bool CalibratingNode::Init() {
     joint_folded = {1.5707893454778887, -2.5900040327772613, 2.3999184786133068, -2.6179938779914945e-05, 0.799936756066561, 8.377580409572782e-05};
 
     std::vector<geometry_msgs::PoseStamped> test_poses_;
-    FillTestPoses(test_poses_, "floor_base", 2., 4, 1.5);
+    FillTestPoses(test_poses_, "floor_base", 1., 4, 1.5);
     ExecutePoses(test_poses_);
 
     // MeasureRobot(100);
@@ -223,15 +223,15 @@ void CalibratingNode::FillTestPoses(std::vector<geometry_msgs::PoseStamped> &pos
             pose_.pose.orientation.z = 0.;
             pose_.pose.orientation.w = 0.;
 
-            // tf2::fromMsg(pose_.pose, tf_pose_);
-            // tf2::toMsg(tf_X_inv_.inverseTimes(tf_pose_), pose_.pose);
+            tf2::fromMsg(pose_.pose, tf_pose_);
+            tf2::toMsg(tf_pose_.inverseTimes(tf_X_inv_), pose_.pose);
             // T_sensor^base = T_tool0^base * T_sensor^tool0
             // T_tool0^base = T_sensor^base * (T_sensor^tool0)^(-1)
 
-            //tf2::doTransform(pose_.pose.orientation, pose_.pose.orientation, tf_msg_X_inv_);
+            // tf2::doTransform(pose_.pose.orientation, pose_.pose.orientation, tf_msg_X_inv_);
             poses_[i*n + j] = pose_;
 
-            // tf2::doTransform(pose_, poses_[i*n + j], tf_base_);
+            // tf2::doTransform(pose_, poses_[i*n + j], tf_msg_X_inv_);
         }
     }
 }
