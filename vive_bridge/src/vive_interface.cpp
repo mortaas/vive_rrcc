@@ -41,7 +41,7 @@ ViveInterface::ViveInterface()
 ViveInterface::~ViveInterface() {
 }
 
-bool ViveInterface::Init() {
+bool ViveInterface::Init(int argc, char **argv) {
       /**
      * Initialize the OpenVR API and get access to the vr::IVRSystem interface.
      * The vr::IVRSystem interface provides access to display configuration information, 

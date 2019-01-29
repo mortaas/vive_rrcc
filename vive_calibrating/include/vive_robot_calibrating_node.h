@@ -74,7 +74,7 @@ class CalibratingNode {
     geometry_msgs::TransformStamped tf_msg_;
 
     geometry_msgs::TransformStamped tf_msg_tool0_, tf_msg_sensor_;
-    geometry_msgs::TransformStamped tf_msg_A_, tf_msg_B_;
+    geometry_msgs::TransformStamped tf_msg_A_, tf_msg_B_, tf_msg_X_inv_;
     // std::vector<geometry_msgs::Transform> tf_Avec_, tf_Bvec_;
     
     geometry_msgs::TransformStamped tf_msg_pose_;
@@ -139,8 +139,9 @@ class CalibratingNode {
     geometry_msgs::Pose SphereNormalPose(double r, double theta, double phi, geometry_msgs::Pose &pose_);
     geometry_msgs::Pose GenerateRandomPose(geometry_msgs::Pose &pose_);
 
-    void FillTestPoses(std::vector<geometry_msgs::PoseStamped> &poses_, std::string frame_id, double L, int n, double z);
-    void ExecutePoses(std::vector<geometry_msgs::PoseStamped> &poses_);
+    void FillTestPlanePoses(std::vector<geometry_msgs::PoseStamped> &poses_, std::string frame_id, 
+                            double L, int n, double x_offset, double y_offset, double z_offset);
+    void ExecuteTestPoses(std::vector<geometry_msgs::PoseStamped> &poses_);
 
     // bool GetJointPositionsFromIK(const geometry_msgs::PoseStamped &pose_, std::vector<double> joint_values);
     

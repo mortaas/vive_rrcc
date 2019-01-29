@@ -130,7 +130,7 @@ class ViveNode {
         ViveNode(int frequency);
         ~ViveNode();
 
-        bool Init();
+        bool Init(int argc, char **argv);
         void Loop();
         void Shutdown();
 };

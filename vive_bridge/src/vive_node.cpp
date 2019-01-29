@@ -261,17 +261,17 @@ void ViveNode::UpdateTrackedDevices() {
                                                                 break;
             }
         } else {
-            devices_msg_.device_frames[i] = "";
+            devices_msg_.device_frames[i] = "error_" + TrackedDevices[i].serial_number;
         }
     }
 }
 
-bool ViveNode::Init() {
+bool ViveNode::Init(int argc, char **argv) {
       /**
      * Initialize OpenVR and the node
      */
 
-    if (vr_.Init() ) {
+    if (vr_.Init(argc, argv) ) {
         if (!InitParams() ) {
             ROS_WARN_STREAM("Failed to get parameters from the parameter server.");
             ROS_WARN_STREAM("Using default parameters.");
@@ -497,7 +497,7 @@ int main(int argc, char** argv) {
     // Handle signal [ctrl + c]
     signal(SIGINT, IntHandler);
 
-    if (!node_.Init() ) {
+    if (!node_.Init(argc, argv) ) {
         node_.Shutdown();
         exit(EXIT_FAILURE);
     }
