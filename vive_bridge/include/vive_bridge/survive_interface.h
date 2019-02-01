@@ -2,13 +2,19 @@
 #define _SURVIVE_INTERFACE_H_
 
 #include <openvr.h>
+#include <libsurvive/survive.h>
 #include <libsurvive/survive_api.h>
-#include <boost/function.hpp>
 
+// Boost
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/function.hpp>
+#include <boost/bind.hpp>
+
+// STL
 #include <iostream>
-#include <map>
 #include <string>
 #include <vector>
+#include <map>
 
 // ROS logging
 typedef boost::function<void(const std::string&)> DebugMsgCallback;
@@ -20,8 +26,8 @@ typedef boost::function<void(const std::string&)> FatalMsgCallback;
 class ViveInterface {
     // OpenVR
     // vr::IVRSystem *pHMD_;
-    // vr::VREvent_t event_;
-    // vr::VRControllerState_t controller_state_;
+    vr::VREvent_t event_;
+    vr::VRControllerState_t controller_state_;
     vr::TrackedDevicePose_t device_poses_[8];
 
     // std::string GetStringProperty(vr::TrackedDeviceIndex_t unDeviceIndex, vr::TrackedDeviceProperty prop, vr::TrackedPropertyError *pError);
@@ -30,7 +36,12 @@ class ViveInterface {
     SurviveSimpleContext *actx_;
     SurvivePose survive_pose_;
 
+    int device_count;
+    std::vector<int> device_classes_;
     std::vector<std::string> device_names_;
+
+    // Callback functions
+    static void wrapper_button_process(SurviveObject *so_, uint8_t eventType, uint8_t buttonId, uint8_t axis1Id, uint16_t axis1Val, uint8_t axis2Id, uint16_t axis2Val);
 
     // Callback functions for ROS logging
     DebugMsgCallback VR_DEBUG;
@@ -49,6 +60,7 @@ class ViveInterface {
 
         // libsurvive
         bool ConvertSurvivePose(SurvivePose &pose_, float m[3][4]);
+        int GetSurviveClass(const std::string &device_name);
 
         bool PoseIsValid(const int &device_index);
         void GetControllerState(const int &device_index, std::vector<float> &axes, std::vector<int> &buttons);

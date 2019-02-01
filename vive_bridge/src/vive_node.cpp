@@ -319,6 +319,8 @@ bool ViveNode::Init(int argc, char **argv) {
         // Update and publish info about tracked devices
         devices_msg_.device_classes.resize(8);
         devices_msg_.device_frames.resize(8);
+
+        vr_.Update();
         UpdateTrackedDevices();
         PublishTrackedDevices();
 

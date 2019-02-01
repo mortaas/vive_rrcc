@@ -92,6 +92,7 @@ class CalibratingNode {
         void Shutdown();
 };
 
+
 bool CalibratingNode::Measure() {
     std::string pError;
 

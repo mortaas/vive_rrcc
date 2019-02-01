@@ -174,6 +174,7 @@ include_directories(
   ${OPENVR_INCLUDE_DIR}
   ${SURVIVE_INCLUDE_DIR}
 )
+link_directories(${SURVIVE}/lib)
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}

@@ -30,6 +30,9 @@
 #include <Eigen/Geometry>
 #include <Eigen/SVD>
 
+// dr_eigen
+#include <average.h>
+
 // MoveIt!
 #include <moveit/move_group_interface/move_group_interface.h>
 
@@ -73,8 +76,8 @@ class CalibratingNode {
     control_msgs::FollowJointTrajectoryGoal traj_goal_msg_;
     geometry_msgs::TransformStamped tf_msg_;
 
-    geometry_msgs::TransformStamped tf_msg_tool0_, tf_msg_sensor_;
-    geometry_msgs::TransformStamped tf_msg_A_, tf_msg_B_, tf_msg_X_inv_;
+    geometry_msgs::TransformStamped tf_msg_tool0_, tf_msg_sensor_, tf_msg_diff_;
+    geometry_msgs::TransformStamped tf_msg_A_, tf_msg_B_, tf_msg_X_, tf_msg_X_inv_;
     // std::vector<geometry_msgs::Transform> tf_Avec_, tf_Bvec_;
     
     geometry_msgs::TransformStamped tf_msg_pose_;
@@ -96,10 +99,10 @@ class CalibratingNode {
     moveit::planning_interface::MoveGroupInterface move_group_;
     static const std::string PLANNING_GROUP;
     // RobotState
-    robot_model_loader::RobotModelLoader robot_model_loader_;
-    robot_model::RobotModelPtr kinematic_model_;
-    robot_state::RobotStatePtr kinematic_state_;
-    const robot_state::JointModelGroup* joint_model_group_;
+    // robot_model_loader::RobotModelLoader robot_model_loader_;
+    // robot_model::RobotModelPtr kinematic_model_;
+    // robot_state::RobotStatePtr kinematic_state_;
+    // const robot_state::JointModelGroup* joint_model_group_;
 
     bool MoveRobot(const geometry_msgs::PoseStamped &pose_);
     std::vector<double> joint_values, joint_folded;
@@ -118,11 +121,17 @@ class CalibratingNode {
     tf2::Transform tf_pose_, tf_controller_;
 
     void MeasureRobot(const int &N);
+    void SampleSensor(const std::string &target_frame, const std::string &source_frame,
+                      const int &N, const int &F, geometry_msgs::TransformStamped &tf_msg_avg_);
 
     // Eigen
-    Eigen::Affine3d eigen_Ta_, eigen_Tb_;
-    Eigen::Matrix3d eigen_Rx_, eigen_M_;
-    Eigen::Vector3d eigen_tx_;
+    // Eigen::Affine3d eigen_Ta_, eigen_Tb_;
+    // Eigen::Matrix3d eigen_Rx_, eigen_M_;
+    // Eigen::Vector3d eigen_tx_;
+
+    std::vector<Eigen::Vector3d> eigen_translations_;
+    std::vector<Eigen::Quaterniond> eigen_rotations_;
+
 
     Eigen::Vector3d RotationMatrixLogarithm(const Eigen::Matrix3d &rotmat_);
 
