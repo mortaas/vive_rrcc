@@ -172,10 +172,10 @@ bool CalibratingNode::Init() {
 
     std::string pError;
     if (!tf_buffer_.canTransform(controller_frame,
-                                 "world", ros::Time(0),
+                                 "root", ros::Time(0),
                                  ros::Duration(5.0), &pError) )
     {
-        ROS_ERROR_STREAM("Can't transform from world to " + controller_frame + ": " + pError);
+        ROS_ERROR_STREAM("Can't transform from root to " + controller_frame + ": " + pError);
 
         return false;
     }

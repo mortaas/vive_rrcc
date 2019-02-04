@@ -19,6 +19,9 @@ inline void DefaultFatalMsgCallback(const std::string &msg) {
     std::cerr << "VR Fatal: " << msg << std::endl;
 }
 
+int controller_event_type, controller_device_index;
+// struct SurviveObject *controller_so_;
+
 // std::map<vr::TrackedPropertyError, std::string> TrackedPropErrorStrings
 // {
 //   { vr::TrackedProp_Success, "The property request was successful"}, 
@@ -32,50 +35,31 @@ inline void DefaultFatalMsgCallback(const std::string &msg) {
 //   { vr::TrackedProp_StringExceedsMaximumLength, "The string property value returned by a driver exceeded the maximum property length of 32k." }
 // };
 
-void ViveInterface::button_process(SurviveObject * so, uint8_t eventType, uint8_t buttonId, uint8_t axis1Id, uint16_t axis1Val, uint8_t axis2Id, uint16_t axis2Val)
+void button_process(SurviveObject * so, uint8_t eventType, uint8_t buttonId, uint8_t axis1Id, uint16_t axis1Val, uint8_t axis2Id, uint16_t axis2Val)
 {
 	survive_default_button_process(so, eventType, buttonId, axis1Id, axis1Val, axis2Id, axis2Val);
 
-    // eventType 1: button press
-    // eventType 2: button unpress
-    // eventType 3: axis interact
+    // controller_device_index = (int)so->codename[2] - '0';
+    controller_device_index = 3;
 
-    // [BUTTONS]
-    // Trackpad - buttonId 1
-    // System - buttonId 3
-    // Grip - buttonId 4
-    // Menu - buttonId 5
-    // Trigger - buttonId 24
+    switch(eventType) {
+        case BUTTON_EVENT_BUTTON_DOWN : 
+            controller_event_type = 200; // ButtonPress
+            break;
+        case BUTTON_EVENT_BUTTON_UP :
+            controller_event_type = 201; // ButtonUnpress
+            break;
+        case BUTTON_EVENT_AXIS_CHANGED :
+            if (axis1Val + axis2Val > 0) {
+                controller_event_type = 202; // ButtonTouch
+            } else {
+                controller_event_type = 203; // ButtonUntouch
+            }
+            break;
+        default:
+            controller_event_type = 0;
+    }
 
-    // [AXIS]
-    // axis1:1 Trigger
-    // axis1:2 Trackpad x
-    // axis2:3 Trackpad y
-
-    // std::ptrdiff_t i = std::distance(*so_->ctx->objs, so_);
-    // controller_states_[i].ulButtonPressed = 0;
-
-    // Axes
-    // axes[0] = controller_state_.rAxis[0].x;
-    // axes[1] = controller_state_.rAxis[0].y;
-    // axes[2] = controller_state_.rAxis[1].x;
-
-    // Buttons
-    // inline uint64_t ButtonMaskFromId( EVRButtonId id ) { return 1ull << id; }
-    // if (vr::ButtonMaskFromId(vr::k_EButton_ApplicationMenu) & controller_state_.ulButtonPressed) {
-    //     buttons[0] = 1;
-    // }
-    // if (vr::ButtonMaskFromId(vr::k_EButton_Dashboard_Back) & controller_state_.ulButtonPressed) {
-    //     buttons[1] = 1;
-    // }
-    // if (vr::ButtonMaskFromId(vr::k_EButton_SteamVR_Touchpad) & controller_state_.ulButtonPressed) {
-    //     buttons[2] = 1;
-    // }
-    // if (vr::ButtonMaskFromId(vr::k_EButton_SteamVR_Trigger) & controller_state_.ulButtonPressed) {
-    //     buttons[3] = 1;
-    // }
-
-	// do nothing.
 	// printf("ButtonEntry: eventType:%x, buttonId:%d, axis1:%d, axis1Val:%8.8x, axis2:%d, axis2Val:%8.8x\n",
 	// 	eventType,
 	// 	buttonId,
@@ -153,12 +137,7 @@ bool ViveInterface::Init(int argc, char **argv) {
 
     actx_ = survive_simple_init(argc, argv);
 
-    // auto mem_button_process = std::mem_fn(&ViveInterface::button_process);
-    // button_process_func *button_process_ptr = *this->button_process;
-    // survive_install_button_fn(actx_->ctx, &ViveInterface::button_process);
-
-    // Logging to ROS
-    // survive_install_error_fn(actx_->ctx, VR_ERROR);
+    survive_install_button_fn(actx_->ctx, button_process);
 
     // Check if libsurvive is initialized properly
     if (actx_ == nullptr) {
@@ -238,29 +217,22 @@ void ViveInterface::GetControllerState(const int &device_index, std::vector<floa
 
     // pHMD_->GetControllerState(device_index, &controller_state_, sizeof(vr::VRControllerState_t) );
 
-    // Axes
-    // axes[0] = controller_state_.rAxis[0].x;
-    // axes[1] = controller_state_.rAxis[0].y;
-    // axes[2] = controller_state_.rAxis[1].x;
+    if (survive_simple_is_running(actx_) ) {
+        const struct SurviveObject *so_ = actx_->objects[device_index].data.so;
 
-    axes[0] = 0.;
-    axes[1] = 0.;
-    axes[2] = 0.;
+        axes[0] = so_->axis1 / 32640.;
+        axes[1] = so_->axis2 / 32767.;
+        axes[2] = so_->axis3 / 32767.;
 
-    // Buttons
-    buttons.assign(13, 0);
-    // if (vr::ButtonMaskFromId(vr::k_EButton_ApplicationMenu) & controller_state_.ulButtonPressed) {
-    //     buttons[0] = 1;
-    // }
-    // if (vr::ButtonMaskFromId(vr::k_EButton_Dashboard_Back) & controller_state_.ulButtonPressed) {
-    //     buttons[1] = 1;
-    // }
-    // if (vr::ButtonMaskFromId(vr::k_EButton_SteamVR_Touchpad) & controller_state_.ulButtonPressed) {
-    //     buttons[2] = 1;
-    // }
-    // if (vr::ButtonMaskFromId(vr::k_EButton_SteamVR_Trigger) & controller_state_.ulButtonPressed) {
-    //     buttons[3] = 1;
-    // }
+        buttons.assign(13, 0);
+        if ( so_->buttonmask &  1)       { buttons[3] = 1; } // Trigger
+        if ((so_->buttonmask &  6) == 6) { buttons[2] = 1; } // Touchpad
+        if ((so_->buttonmask & 16) >> 4) { buttons[1] = 1; } // Grip
+        if ((so_->buttonmask & 32) >> 5) { buttons[0] = 1; } // Menu
+    } else {
+        axes.assign(3, 0.);
+        buttons.assign(13, 0);
+    }
 }
 
 bool ViveInterface::PollNextEvent(int &event_type, int &device_index) {
@@ -283,8 +255,14 @@ bool ViveInterface::PollNextEvent(int &event_type, int &device_index) {
     //     return true;
     // }
 
-    event_type = 0;
-    device_index = 0xFFFFFFFF;
+    // std::ptrdiff_t i = std::distance(controller_so_->ctx->objs[0], controller_so_);
+    // VR_INFO(std::to_string(actx_->objects[3].data.so->) );
+
+    event_type = controller_event_type;
+    device_index = controller_device_index;
+
+    controller_event_type = 0;
+    controller_device_index = 0xFFFFFFFF;
 
     return false;
 }
@@ -323,9 +301,9 @@ void ViveInterface::GetDeviceSN(const int &device_index, std::string &device_sn)
     //     VR_ERROR("Error occurred when getting serial number from tracked device: " + TrackedPropErrorStrings[pError] );
     // }
 
-    // device_sn = device_names_[device_index];
+    device_sn = device_names_[device_index];
 
-    const struct SurviveObject *so_ = actx_->objects[device_index].data.so;
+    // const struct SurviveObject *so_ = actx_->objects[device_index].data.so;
 }
 
 void ViveInterface::GetDevicePose(const int &device_index, float m[3][4]) {
@@ -402,48 +380,15 @@ void ViveInterface::Update() {
             uint32_t timecode = survive_simple_object_get_latest_pose(it_, &survive_pose_);
 
             // Convert survive pose to OpenVR 3x4 matrix
-            PoseToMatrix((double*) ogl_pose, &survive_pose_);
-            matrix44transpose((double *) ogl_transpose, (double *) ogl_pose);
-            memcpy(device_poses_[i].mDeviceToAbsoluteTracking.m, ogl_transpose, sizeof(float) * 16);
+            PoseToMatrix(ogl_pose, &survive_pose_);
+            std::copy(ogl_pose, ogl_pose + 16, &device_poses_[i].mDeviceToAbsoluteTracking.m[0][0]);
+
+            const SurvivePose *imu_pose_ = &it_->data.so->OutPoseIMU;
+            printf("%s (%u): %f %f %f %f %f %f %f\n", survive_simple_object_name(it_), timecode, imu_pose_->Pos[0],
+			       imu_pose_->Pos[1], imu_pose_->Pos[2], imu_pose_->Rot[0], imu_pose_->Rot[1], imu_pose_->Rot[2], imu_pose_->Rot[3]);
         }
     }
 }
-
-// bool ViveInterface::ConvertSurvivePose(SurvivePose &pose_, float m[3][4]) {
-//     /*
-//     * Convert SurvivePose (quaternion) to 3x4 transformation matrix
-//     */
-
-//     double d = pose_.Rot[0] * pose_.Rot[0] +
-//                pose_.Rot[1] * pose_.Rot[1] +
-//                pose_.Rot[2] * pose_.Rot[2] +
-//                pose_.Rot[3] * pose_.Rot[3];
-
-//     if (d != 0.) {
-//         double s = 2. / d;
-
-//         double xs = pose_.Rot[1] * s,   ys = pose_.Rot[2] * s,   zs = pose_.Rot[3] * s;
-//         double wx = pose_.Rot[0] * xs,  wy = pose_.Rot[0] * ys,  wz = pose_.Rot[0] * zs;
-//         double xx = pose_.Rot[1] * xs,  xy = pose_.Rot[1] * ys,  xz = pose_.Rot[1] * zs;
-//         double yy = pose_.Rot[2] * ys,  yz = pose_.Rot[2] * zs,  zz = pose_.Rot[3] * zs;
-
-//         m[0][0] = 1.0 - (yy + zz);  m[0][1] =         xy - wz;  m[0][2] =         xz + wy;
-//         m[1][0] =         xy + wz;  m[1][1] = 1.0 - (xx + zz);  m[1][2] =         yz - wx;
-//         m[2][0] =         xz - wy;  m[2][1] =         yz + wx;  m[2][2] = 1.0 - (xx + yy);
-
-//         m[0][3] = pose_.Pos[0];
-//         m[1][3] = pose_.Pos[1];
-//         m[2][3] = pose_.Pos[2];
-//     } else {
-//         m[0][0] = 1; m[0][1] = 0; m[0][2] = 0;
-//         m[1][0] = 0; m[1][1] = 1; m[1][2] = 0;
-//         m[2][0] = 0; m[2][1] = 0; m[2][2] = 1;
-
-//         m[0][3] = 0;
-//         m[1][3] = 0;
-//         m[2][3] = 0;
-//     }
-// }
 
 void ViveInterface::TriggerHapticPulse(const int &device_index, const int &axis_id, int duration) {
     /*

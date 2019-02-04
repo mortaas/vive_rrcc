@@ -11,11 +11,13 @@
 #include <boost/bind.hpp>
 
 // STL
+#include <algorithm>
 #include <iostream>
 #include <iterator>
 #include <string>
 #include <vector>
 #include <map>
+#include <queue>
 
 // ROS logging
 typedef boost::function<void(const std::string&)> DebugMsgCallback;
@@ -37,13 +39,13 @@ class ViveInterface {
     SurviveSimpleContext *actx_;
 
     SurvivePose survive_pose_;
-    float ogl_pose[16], ogl_transpose[16];
+    FLT ogl_pose[16], ogl_transpose[16];
 
     std::array<int, 8> device_classes_;
     std::array<std::string, 8> device_names_;
 
     // Callback functions
-    void button_process(SurviveObject * so, uint8_t eventType, uint8_t buttonId, uint8_t axis1Id, uint16_t axis1Val, uint8_t axis2Id, uint16_t axis2Val);
+    // void button_process(SurviveObject * so, uint8_t eventType, uint8_t buttonId, uint8_t axis1Id, uint16_t axis1Val, uint8_t axis2Id, uint16_t axis2Val);
 
     // Callback functions for ROS logging
     DebugMsgCallback VR_DEBUG;
