@@ -1,47 +1,6 @@
 #include "vive_bridge/survive_interface.h"
+#include "vive_bridge/survive_types.h"
 
-
-#include "inttypes.h"
-#include "os_generic.h"
-#include "stdio.h"
-#include "string.h"
-
-struct SurviveExternalObject {
-	SurvivePose pose;
-};
-
-struct SurviveSimpleObject {
-	struct SurviveSimpleContext *actx;
-
-	enum SurviveSimpleObject_type {
-		SurviveSimpleObject_LIGHTHOUSE,
-		SurviveSimpleObject_OBJECT,
-		SurviveSimpleObject_EXTERNAL
-	} type;
-
-	union {
-		int lighthouse;
-		struct SurviveObject *so;
-		struct SurviveExternalObject seo;
-	} data;
-
-	char name[32];
-	bool has_update;
-};
-
-struct SurviveSimpleContext {
-	SurviveContext* ctx; 
-	
-	bool running;
-	og_thread_t thread;
-	og_mutex_t poll_mutex;
-
-	size_t external_object_ct;
-	struct SurviveSimpleObject *external_objects;
-
-	size_t object_ct;
-	struct SurviveSimpleObject objects[];
-};
 
 // Default functions for logging
 inline void DefaultDebugMsgCallback(const std::string &msg) {
@@ -73,18 +32,9 @@ inline void DefaultFatalMsgCallback(const std::string &msg) {
 //   { vr::TrackedProp_StringExceedsMaximumLength, "The string property value returned by a driver exceeded the maximum property length of 32k." }
 // };
 
-void ViveInterface::wrapper_button_process(SurviveObject *so_, uint8_t eventType, uint8_t buttonId, uint8_t axis1Id, uint16_t axis1Val, uint8_t axis2Id, uint16_t axis2Val)
+void ViveInterface::button_process(SurviveObject * so, uint8_t eventType, uint8_t buttonId, uint8_t axis1Id, uint16_t axis1Val, uint8_t axis2Id, uint16_t axis2Val)
 {
-	survive_default_button_process(so_, eventType, buttonId, axis1Id, axis1Val, axis2Id, axis2Val);
-	
-	// do nothing.
-	printf("ButtonEntry: eventType:%x, buttonId:%d, axis1:%d, axis1Val:%8.8x, axis2:%d, axis2Val:%8.8x\n",
-		eventType,
-		buttonId,
-		axis1Id,
-		axis1Val,
-		axis2Id,
-		axis2Val);
+	survive_default_button_process(so, eventType, buttonId, axis1Id, axis1Val, axis2Id, axis2Val);
 
     // eventType 1: button press
     // eventType 2: button unpress
@@ -101,6 +51,38 @@ void ViveInterface::wrapper_button_process(SurviveObject *so_, uint8_t eventType
     // axis1:1 Trigger
     // axis1:2 Trackpad x
     // axis2:3 Trackpad y
+
+    // std::ptrdiff_t i = std::distance(*so_->ctx->objs, so_);
+    // controller_states_[i].ulButtonPressed = 0;
+
+    // Axes
+    // axes[0] = controller_state_.rAxis[0].x;
+    // axes[1] = controller_state_.rAxis[0].y;
+    // axes[2] = controller_state_.rAxis[1].x;
+
+    // Buttons
+    // inline uint64_t ButtonMaskFromId( EVRButtonId id ) { return 1ull << id; }
+    // if (vr::ButtonMaskFromId(vr::k_EButton_ApplicationMenu) & controller_state_.ulButtonPressed) {
+    //     buttons[0] = 1;
+    // }
+    // if (vr::ButtonMaskFromId(vr::k_EButton_Dashboard_Back) & controller_state_.ulButtonPressed) {
+    //     buttons[1] = 1;
+    // }
+    // if (vr::ButtonMaskFromId(vr::k_EButton_SteamVR_Touchpad) & controller_state_.ulButtonPressed) {
+    //     buttons[2] = 1;
+    // }
+    // if (vr::ButtonMaskFromId(vr::k_EButton_SteamVR_Trigger) & controller_state_.ulButtonPressed) {
+    //     buttons[3] = 1;
+    // }
+
+	// do nothing.
+	// printf("ButtonEntry: eventType:%x, buttonId:%d, axis1:%d, axis1Val:%8.8x, axis2:%d, axis2Val:%8.8x\n",
+	// 	eventType,
+	// 	buttonId,
+	// 	axis1Id,
+	// 	axis1Val,
+	// 	axis2Id,
+	// 	axis2Val);
     
 	// // Note: the code for haptic feedback is not yet written to support wired USB connections to the controller.  
 	// // Work is still needed to reverse engineer that USB protocol.
@@ -143,8 +125,8 @@ ViveInterface::ViveInterface()
       VR_ERROR(DefaultErrorMsgCallback),
       VR_FATAL(DefaultFatalMsgCallback)
 {
-    device_classes_.assign(8, 0);
-    device_names_.assign(8, "UNKNOWN");
+    device_classes_.fill(0);
+    device_names_.fill("UNKNOWN");
 }
 ViveInterface::~ViveInterface() {
 }
@@ -170,7 +152,13 @@ bool ViveInterface::Init(int argc, char **argv) {
     // return true;
 
     actx_ = survive_simple_init(argc, argv);
-    survive_install_button_fn(actx_->ctx, wrapper_button_process);
+
+    // auto mem_button_process = std::mem_fn(&ViveInterface::button_process);
+    // button_process_func *button_process_ptr = *this->button_process;
+    // survive_install_button_fn(actx_->ctx, &ViveInterface::button_process);
+
+    // Logging to ROS
+    // survive_install_error_fn(actx_->ctx, VR_ERROR);
 
     // Check if libsurvive is initialized properly
     if (actx_ == nullptr) {
@@ -181,16 +169,16 @@ bool ViveInterface::Init(int argc, char **argv) {
 
     survive_simple_start_thread(actx_);
 
-    device_count = 0;
-
     if (survive_simple_is_running(actx_) ) {
-        for (const SurviveSimpleObject *it_ = survive_simple_get_first_object(actx_); it_ != nullptr;
-			                            it_ = survive_simple_get_next_object(actx_, it_) )
-        {
-            device_names_[device_count] = survive_simple_object_name(it_);
-            device_classes_[device_count] = GetSurviveClass(device_names_[device_count] );
+        const SurviveSimpleObject *fsao_= survive_simple_get_first_object(actx_);
 
-            device_count++;
+        for (const SurviveSimpleObject *it_ = fsao_; it_ != nullptr;
+                                        it_ = survive_simple_get_next_object(actx_, it_) )
+        {
+            std::ptrdiff_t i = std::distance(fsao_, it_);
+
+            device_names_[i] = survive_simple_object_name(it_);
+            device_classes_[i] = GetSurviveClass(device_names_[i] );
         }
     } else {
         VR_FATAL("libsurvive initialization failed");
@@ -335,7 +323,9 @@ void ViveInterface::GetDeviceSN(const int &device_index, std::string &device_sn)
     //     VR_ERROR("Error occurred when getting serial number from tracked device: " + TrackedPropErrorStrings[pError] );
     // }
 
-    device_sn = device_names_[device_index];
+    // device_sn = device_names_[device_index];
+
+    const struct SurviveObject *so_ = actx_->objects[device_index].data.so;
 }
 
 void ViveInterface::GetDevicePose(const int &device_index, float m[3][4]) {
@@ -378,7 +368,14 @@ bool ViveInterface::PoseIsValid(const int &device_index) {
     //         device_poses_[device_index].bPoseIsValid &&
     //         device_poses_[device_index].bDeviceIsConnected);
 
-    if (device_names_[device_index] != "UNKNOWN") {
+    // if (device_names_[device_index] != "UNKNOWN") {
+    //     return true;
+    // } else {
+    //     return false;
+    // }
+
+    // Check if the device is populated
+    if ((actx_->object_ct - device_index) >= 0) {
         return true;
     } else {
         return false;
@@ -394,53 +391,59 @@ void ViveInterface::Update() {
     // pHMD_->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0, device_poses_, vr::k_unMaxTrackedDeviceCount);
 
     if (survive_simple_is_running(actx_) ) {
-        for (const SurviveSimpleObject *it_ = survive_simple_get_first_object(actx_); it_ != nullptr;
-			                            it_ = survive_simple_get_next_object(actx_, it_) )
-        {
-            uint32_t timecode = survive_simple_object_get_latest_pose(it_, &survive_pose_);
-            ConvertSurvivePose(survive_pose_, device_poses_[device_count].mDeviceToAbsoluteTracking.m);
+        const SurviveSimpleObject *fsao_;
+        fsao_ = survive_simple_get_first_object(actx_);
 
-            // printf("%s (%u): %f %f %f %f %f %f %f\n", survive_simple_object_name(it_), timecode, survive_pose_.Pos[0],
-            //                 survive_pose_.Pos[1], survive_pose_.Pos[2], survive_pose_.Rot[0], survive_pose_.Rot[1], survive_pose_.Rot[2], survive_pose_.Rot[3]);
+        for (const SurviveSimpleObject *it_ = survive_simple_get_next_updated(actx_); it_ != nullptr;
+			                            it_ = survive_simple_get_next_updated(actx_) )
+        {
+            std::ptrdiff_t i = std::distance(fsao_, it_);
+
+            uint32_t timecode = survive_simple_object_get_latest_pose(it_, &survive_pose_);
+
+            // Convert survive pose to OpenVR 3x4 matrix
+            PoseToMatrix((double*) ogl_pose, &survive_pose_);
+            matrix44transpose((double *) ogl_transpose, (double *) ogl_pose);
+            memcpy(device_poses_[i].mDeviceToAbsoluteTracking.m, ogl_transpose, sizeof(float) * 16);
         }
     }
 }
 
-bool ViveInterface::ConvertSurvivePose(SurvivePose &pose_, float m[3][4]) {
-    /*
-    * Convert SurvivePose (quaternion) to 3x4 transformation matrix
-    */
+// bool ViveInterface::ConvertSurvivePose(SurvivePose &pose_, float m[3][4]) {
+//     /*
+//     * Convert SurvivePose (quaternion) to 3x4 transformation matrix
+//     */
 
-    double d = pose_.Rot[0] * pose_.Rot[0] +
-               pose_.Rot[1] * pose_.Rot[1] +
-               pose_.Rot[2] * pose_.Rot[2] +
-               pose_.Rot[3] * pose_.Rot[3];
+//     double d = pose_.Rot[0] * pose_.Rot[0] +
+//                pose_.Rot[1] * pose_.Rot[1] +
+//                pose_.Rot[2] * pose_.Rot[2] +
+//                pose_.Rot[3] * pose_.Rot[3];
 
-    if (d != 0.) {
-        double s = 2. / d;
+//     if (d != 0.) {
+//         double s = 2. / d;
 
-        double xs = pose_.Rot[1] * s,   ys = pose_.Rot[2] * s,   zs = pose_.Rot[3] * s;
-        double wx = pose_.Rot[0] * xs,  wy = pose_.Rot[0] * ys,  wz = pose_.Rot[0] * zs;
-        double xx = pose_.Rot[1] * xs,  xy = pose_.Rot[1] * ys,  xz = pose_.Rot[1] * zs;
-        double yy = pose_.Rot[2] * ys,  yz = pose_.Rot[2] * zs,  zz = pose_.Rot[3] * zs;
+//         double xs = pose_.Rot[1] * s,   ys = pose_.Rot[2] * s,   zs = pose_.Rot[3] * s;
+//         double wx = pose_.Rot[0] * xs,  wy = pose_.Rot[0] * ys,  wz = pose_.Rot[0] * zs;
+//         double xx = pose_.Rot[1] * xs,  xy = pose_.Rot[1] * ys,  xz = pose_.Rot[1] * zs;
+//         double yy = pose_.Rot[2] * ys,  yz = pose_.Rot[2] * zs,  zz = pose_.Rot[3] * zs;
 
-        m[0][0] = 1.0 - (yy + zz);  m[0][1] =         xy - wz;  m[0][2] =         xz + wy;
-        m[1][0] =         xy + wz;  m[1][1] = 1.0 - (xx + zz);  m[1][2] =         yz - wx;
-        m[2][0] =         xz - wy;  m[2][1] =         yz + wx;  m[2][2] = 1.0 - (xx + yy);
+//         m[0][0] = 1.0 - (yy + zz);  m[0][1] =         xy - wz;  m[0][2] =         xz + wy;
+//         m[1][0] =         xy + wz;  m[1][1] = 1.0 - (xx + zz);  m[1][2] =         yz - wx;
+//         m[2][0] =         xz - wy;  m[2][1] =         yz + wx;  m[2][2] = 1.0 - (xx + yy);
 
-        m[0][3] = pose_.Pos[0];
-        m[1][3] = pose_.Pos[1];
-        m[2][3] = pose_.Pos[2];
-    } else {
-        m[0][0] = 1; m[0][1] = 0; m[0][2] = 0;
-        m[1][0] = 0; m[1][1] = 1; m[1][2] = 0;
-        m[2][0] = 0; m[2][1] = 0; m[2][2] = 1;
+//         m[0][3] = pose_.Pos[0];
+//         m[1][3] = pose_.Pos[1];
+//         m[2][3] = pose_.Pos[2];
+//     } else {
+//         m[0][0] = 1; m[0][1] = 0; m[0][2] = 0;
+//         m[1][0] = 0; m[1][1] = 1; m[1][2] = 0;
+//         m[2][0] = 0; m[2][1] = 0; m[2][2] = 1;
 
-        m[0][3] = 0;
-        m[1][3] = 0;
-        m[2][3] = 0;
-    }
-}
+//         m[0][3] = 0;
+//         m[1][3] = 0;
+//         m[2][3] = 0;
+//     }
+// }
 
 void ViveInterface::TriggerHapticPulse(const int &device_index, const int &axis_id, int duration) {
     /*
