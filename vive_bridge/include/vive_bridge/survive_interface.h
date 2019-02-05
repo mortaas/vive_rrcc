@@ -14,9 +14,9 @@
 #include <algorithm>
 #include <iostream>
 #include <iterator>
+#include <map>
 #include <string>
 #include <vector>
-#include <map>
 #include <queue>
 
 // ROS logging

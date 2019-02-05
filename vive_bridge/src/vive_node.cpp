@@ -261,7 +261,7 @@ void ViveNode::UpdateTrackedDevices() {
                                                                 break;
             }
         } else {
-            devices_msg_.device_frames[i] = "error_" + TrackedDevices[i].serial_number;
+            devices_msg_.device_frames[i] = "empty" + TrackedDevices[i].serial_number;
         }
     }
 }
