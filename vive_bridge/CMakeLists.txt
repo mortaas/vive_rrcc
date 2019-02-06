@@ -70,6 +70,7 @@ find_library(SURVIVE_LIBRARIES
   PATHS
     ## Specify directories to search in addition to the default locations
     ${SURVIVE}/lib
+    ${SURVIVE}/lib/plugins
   ## If NO_DEFAULT_PATH is specified, then no additional paths are added to the search
   NO_DEFAULT_PATH
   ## If NO_CMAKE_FIND_ROOT_PATH is used then CMAKE_FIND_ROOT_PATH will not be used

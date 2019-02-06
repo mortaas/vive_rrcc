@@ -68,7 +68,10 @@ void ViveNode::HapticFeedbackCallback(const sensor_msgs::JoyFeedback &msg_) {
       */
     
     if (msg_.type == msg_.TYPE_RUMBLE) {
-        vr_.TriggerHapticPulse(msg_.id, 0, msg_.intensity);
+        // Check if device is a controller
+        if (devices_msg_.device_classes[msg_.id] == devices_msg_.CONTROLLER) {
+            vr_.TriggerHapticPulse(msg_.id, 0, msg_.intensity);
+        }
     }
 }
 
