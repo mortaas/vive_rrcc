@@ -1,10 +1,6 @@
-#include <libsurvive/survive_types.h>
 #include "os_generic.h"
 
-// #include "inttypes.h"
-// #include "stdio.h"
-
-
+// Simple API structures
 struct SurviveExternalObject {
 	SurvivePose pose;
 };
@@ -25,6 +21,7 @@ struct SurviveSimpleObject {
 	} data;
 
 	char name[32];
+	char serial_number[13];
 	bool has_update;
 };
 

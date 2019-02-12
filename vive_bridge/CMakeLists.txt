@@ -76,8 +76,48 @@ find_library(SURVIVE_LIBRARIES
   ## If NO_CMAKE_FIND_ROOT_PATH is used then CMAKE_FIND_ROOT_PATH will not be used
   NO_CMAKE_FIND_ROOT_PATH
 )
-set(SURVIVE_INCLUDE_DIR ${SURVIVE}/include
-                        ${SURVIVE}/redist)
+set(SURVIVE_INCLUDE_DIR ${SURVIVE}/include/libsurvive
+                        ${SURVIVE}/redist
+                        ${SURVIVE}/src)
+
+SET(SURVIVE_SRCS ${SURVIVE_SRCS}
+    ${SURVIVE}/include/libsurvive/poser.h
+    ${SURVIVE}/include/libsurvive/survive.h
+    ${SURVIVE}/include/libsurvive/survive_api.h
+    ${SURVIVE}/include/libsurvive/survive_optimizer.h
+    ${SURVIVE}/include/libsurvive/survive_reproject.h
+    ${SURVIVE}/include/libsurvive/survive_types.h
+    ${SURVIVE}/redist/crc32.c
+    ${SURVIVE}/redist/glutil.c
+    ${SURVIVE}/redist/jsmn.c
+    ${SURVIVE}/redist/jsmntest.c
+    ${SURVIVE}/redist/json_helpers.c
+    ${SURVIVE}/redist/linmath.c
+    ${SURVIVE}/redist/mpfit/mpfit.c
+    ${SURVIVE}/redist/puff.c
+    ${SURVIVE}/redist/symbol_enumerator.c
+    ${SURVIVE}/src/ootx_decoder.c
+    ${SURVIVE}/src/poser.c
+    ${SURVIVE}/src/poser_general_optimizer.c
+    ${SURVIVE}/src/survive.c
+    ${SURVIVE}/src/survive_api.c
+    ${SURVIVE}/src/survive_cal.c
+    ${SURVIVE}/src/survive_config.c
+    ${SURVIVE}/src/survive_default_devices.c
+    ${SURVIVE}/src/survive_disambiguator.c
+    ${SURVIVE}/src/survive_driverman.c
+    ${SURVIVE}/src/survive_imu.c
+    ${SURVIVE}/src/survive_optimizer.c
+    ${SURVIVE}/src/survive_playback.c        
+    ${SURVIVE}/src/survive_plugins.c
+    ${SURVIVE}/src/survive_process.c
+    ${SURVIVE}/src/survive_reproject.c
+    ${SURVIVE}/src/survive_reproject.generated.h
+    ${SURVIVE}/src/survive_sensor_activations.c
+    ${SURVIVE}/src/survive_usb.c
+    ${SURVIVE}/src/survive_kalman.c)
+add_library(survive SHARED ${SURVIVE_SRCS})
+set_target_properties(survive PROPERTIES FOLDER "libraries")
 
 ################################################
 ## Declare ROS messages, services and actions ##
@@ -224,6 +264,7 @@ target_link_libraries(survive_bridge_node
   ${OPENVR_LIBRARIES}
   ${SURVIVE_LIBRARIES}
   survive_interface
+  survive
 )
 
 #############

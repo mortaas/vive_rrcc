@@ -2,8 +2,9 @@
 #define _SURVIVE_INTERFACE_H_
 
 #include <openvr.h>
-#include <libsurvive/survive.h>
-#include <libsurvive/survive_api.h>
+
+#include <survive.h>
+#include <survive_api.h>
 
 // Boost
 #include <boost/algorithm/string/predicate.hpp>
@@ -38,6 +39,7 @@ class ViveInterface {
 
     std::array<int, 8> device_classes_;
     std::array<std::string, 8> device_names_;
+    std::array<std::string, 8> device_serials_;
 
     // Callback functions for ROS logging
     DebugMsgCallback VR_DEBUG;

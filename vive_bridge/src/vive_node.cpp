@@ -421,8 +421,12 @@ void ViveNode::Loop() {
                     tf2::convert(tf_current_pose_ * tf_tracker_, transform_msg_.transform);
                 }
 
-                transform_msg_.header.stamp = ros::Time::now();
-                tf_broadcaster_.sendTransform(transform_msg_);
+                // Check if the pose has a valid unit quaternion
+                tf2Scalar sq_length = tf_current_pose_.getRotation().length2();
+                if (sq_length >= 0.9999 && sq_length <= 1.0001) {
+                    transform_msg_.header.stamp = ros::Time::now();
+                    tf_broadcaster_.sendTransform(transform_msg_);
+                }
 
                 // Check if current tracked device is not a lighthouse (i.e. twist is available)
                 if (devices_msg_.device_classes[i] != vr::TrackedDeviceClass_TrackingReference) {

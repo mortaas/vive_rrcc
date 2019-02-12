@@ -1,5 +1,6 @@
 #include "vive_bridge/survive_interface.h"
 #include "vive_bridge/survive_types.h"
+#include "survive_config.h"
 
 
 // Default functions for logging
@@ -40,12 +41,21 @@ static std::queue<int> controller_event_type, controller_device_index;
 //     OGUnlockMutex(actx->poll_mutex);
 // }
 
+static void light_process( SurviveObject * so, int sensor_id, int acode, int timeinsweep, uint32_t timecode, uint32_t length, uint32_t lh)
+{
+    survive_default_light_process(so, sensor_id, acode, timeinsweep, timecode, length, lh);
+
+    printf("Light: [%u][lh %u][%s][acode %u][sensor %u][time in sweep %u][length %u]\n", timecode,
+           lh, so->codename, acode, sensor_id, timeinsweep, length);
+}
+
 static void imu_process(SurviveObject * so, int mask, FLT * accelgyromag, uint32_t timecode, int id)
 {
     struct SurviveSimpleContext *actx = (struct SurviveSimpleContext *) so->ctx->user_ptr;
+
 	OGLockMutex(actx->poll_mutex);
 
-	survive_default_imu_process(so, mask, accelgyromag, timecode, id);
+	    survive_default_imu_process(so, mask, accelgyromag, timecode, id);
 
     OGUnlockMutex(actx->poll_mutex);
 }
@@ -112,6 +122,7 @@ bool ViveInterface::Init(int argc, char **argv) {
     // Install callback functions
     survive_install_button_fn(actx_->ctx, button_process);
     survive_install_imu_fn(actx_->ctx, imu_process);
+    // survive_install_light_fn(actx_->ctx, light_process);
 
     // survive_install_error_fn(actx_->ctx, error_fn);
     // survive_install_info_fn(actx_->ctx, info_fn);
@@ -135,6 +146,7 @@ bool ViveInterface::Init(int argc, char **argv) {
 
             // Populate device info
             device_names_[i] = survive_simple_object_name(it_);
+            device_serials_[i] = survive_simple_serial_number(it_);
             device_classes_[i] = SurviveClassToOpenVR(device_names_[i]);
         }
     } else {
@@ -265,7 +277,11 @@ void ViveInterface::GetDeviceSN(const int &device_index, std::string &device_sn)
      * and the device name is therefore returned as a UID instead
      */
 
-    device_sn = device_names_[device_index];
+    if (!(device_classes_[device_index] == 4) ) {
+        device_sn = device_serials_[device_index];
+    } else {
+        device_sn = device_names_[device_index][2];
+    }
 }
 
 void ViveInterface::GetDevicePose(const int &device_index, float m[3][4]) {
@@ -319,7 +335,7 @@ bool ViveInterface::PoseIsValid(const int &device_index) {
 
 void ViveInterface::Update() {
     /*
-    * Calculates updated poses for all tracked devices
+    * Calculates updated poses and velocities for all tracked devices
     */
 
     if (survive_simple_is_running(actx_) ) {
