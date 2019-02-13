@@ -157,22 +157,22 @@ bool ViveNode::InitParams() {
       */
     
     return (nh_.param<std::string>("/vive_node/hmd_mesh_path",           hmd_mesh_path,
-                                   "package://vive_bridge/meshes/vr_hmd_vive_2_0/vr_hmd_vive_2_0.dae") &&
+                                   "package://vive_bridge/meshes/vr_hmd_vive_2_0/vr_hmd_vive_2_0.dae")               &&
             nh_.param<std::string>("/vive_node/controller_mesh_path",    controller_mesh_path,
                                    "package://vive_bridge/meshes/vr_controller_vive_1_5/vr_controller_vive_1_5.dae") &&
             nh_.param<std::string>("/vive_node/tracker_mesh_path",       tracker_mesh_path,
-                                   "package://vive_bridge/meshes/TRACKER-3D.dae") &&
+                                   "package://vive_bridge/meshes/TRACKER-3D.dae")                                    &&
             nh_.param<std::string>("/vive_node/lighthouse_mesh_path",    lighthouse_mesh_path,
-                                   "package://vive_bridge/meshes/lh_basestation_vive/lh_basestation_vive.dae") &&
+                                   "package://vive_bridge/meshes/lh_basestation_vive/lh_basestation_vive.dae")       &&
             
-            nh_.param<std::string>("/vive_node/inertial_frame", inertial_frame, "root") &&
-            nh_.param<std::string>("/vive_node/vr_frame",       vr_frame,       "world_vr") &&
-            nh_.param("/vive_node/vr_x_offset",        vr_x_offset,       0.0) &&
-            nh_.param("/vive_node/vr_y_offset",        vr_y_offset,       0.0) &&
-            nh_.param("/vive_node/vr_z_offset",        vr_z_offset,       0.0) &&
-            nh_.param("/vive_node/vr_yaw_offset",      vr_yaw_offset,     0.0) &&
-            nh_.param("/vive_node/vr_pitch_offset",    vr_pitch_offset,   0.0) &&
-            nh_.param("/vive_node/vr_roll_offset",     vr_roll_offset,    0.0) );
+            nh_.param<std::string>("/vive_node/world_frame", world_frame,       "root")     &&
+            nh_.param<std::string>("/vive_node/vr_frame",    vr_frame,          "world_vr") &&
+            nh_.param("/vive_node/vr_x_offset",              vr_x_offset,       0.0) &&
+            nh_.param("/vive_node/vr_y_offset",              vr_y_offset,       0.0) &&
+            nh_.param("/vive_node/vr_z_offset",              vr_z_offset,       0.0) &&
+            nh_.param("/vive_node/vr_yaw_offset",            vr_yaw_offset,     0.0) &&
+            nh_.param("/vive_node/vr_pitch_offset",          vr_pitch_offset,   0.0) &&
+            nh_.param("/vive_node/vr_roll_offset",           vr_roll_offset,    0.0) );
 }
 
 void ViveNode::ReconfCallback(vive_bridge::ViveConfig &config, uint32_t level) {
@@ -280,7 +280,7 @@ bool ViveNode::Init(int argc, char **argv) {
             ROS_WARN_STREAM("Using default parameters.");
         }
 
-        vr_offset_msg_.header.frame_id = inertial_frame;
+        vr_offset_msg_.header.frame_id = world_frame;
         vr_offset_msg_.child_frame_id = vr_frame;
 
         // Set dynamic reconfigure callback function
@@ -290,11 +290,11 @@ bool ViveNode::Init(int argc, char **argv) {
         // SendOffsetTransform();
 
         // Offset transform message headers
-        vr_offset_msg_.header.frame_id = inertial_frame;
+        vr_offset_msg_.header.frame_id = world_frame;
         vr_offset_msg_.child_frame_id = vr_frame;
 
         // Initialize rviz_visual_tools for publishing tracked device meshes to RViz
-        visual_tools_.reset(new rviz_visual_tools::RvizVisualTools(inertial_frame, "rviz_mesh_markers") );
+        visual_tools_.reset(new rviz_visual_tools::RvizVisualTools(world_frame, "rviz_mesh_markers") );
         visual_tools_->loadMarkerPub(false, true);
         visual_tools_->enableFrameLocking();
         visual_tools_->setLifetime(0);

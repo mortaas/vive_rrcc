@@ -17,6 +17,9 @@
 // Sophus - C++ implementation of Lie Groups using Eigen
 #include <sophus/se3.hpp>
 
+#include "sophus_ros_conversions/eigen.hpp"
+#include "sophus_ros_conversions/geometry.hpp"
+
 
 class ParkMartinNode {
     ros::NodeHandle nh_;
@@ -28,14 +31,12 @@ class ParkMartinNode {
     // tf2
     geometry_msgs::TransformStamped tf_X_;
 
-    // Eigen
-    std::vector<Eigen::Matrix3d> eigen_Ra_, eigen_Rb_;
-    std::vector<Eigen::Vector3d> eigen_ta_, eigen_tb_;
-
-    // Temporary matrices for solving the calibration problem
-    Eigen::Affine3d eigen_Ta_, eigen_Tb_;
-    Eigen::Matrix3d eigen_Rx_, eigen_M_;
-    Eigen::Vector3d eigen_tx_;
+    // Sophus
+    std::vector<Sophus::SE3f> sophus_Ta_, sophus_Tb_;
+    // Solution
+    Sophus::SO3f sophus_Rx_;
+    Sophus::Vector3f sophus_tx_;
+    Sophus::SE3f sophus_Tx_;
 
     int n_samples;
     
@@ -43,8 +44,7 @@ class ParkMartinNode {
                    vive_calibrating::AddSample::Response &res);
     bool ComputeCalibration(vive_calibrating::ComputeCalibration::Request  &req,
                             vive_calibrating::ComputeCalibration::Response &res);
-
-    Eigen::Vector3d RotationMatrixLogarithm(const Eigen::Matrix3d &rotmat_);
+    
     bool ParkMartin();
     void ParkMartinExample();
 

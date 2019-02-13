@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 
 <launch>
-    <rosparam param="/vive_calibrating_node/controller">"controller_LHR_FDB9BFC4"</rosparam>
+    <rosparam param="/vive_calibrating_node/controller_frame">"controller_LHR_FDBBBBC0"</rosparam>
     <rosparam param="/vive_calibrating_node/base_frame">"floor_base"</rosparam>
     <rosparam param="/vive_calibrating_node/tool_frame">"floor_tool0"</rosparam>
     <rosparam param="/vive_calibrating_node/test_frame">"controller_test"</rosparam>

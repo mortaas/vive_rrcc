@@ -95,7 +95,7 @@ class CalibratingNode {
     static const std::string PLANNING_GROUP;
 
     bool MoveRobot(const geometry_msgs::PoseStamped &pose_);
-    std::vector<double> joint_folded;
+    std::vector<double> joints_folded, joints_home;
 
     bool CalibrateViveNode();
 

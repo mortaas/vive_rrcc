@@ -18,9 +18,6 @@ CalibratingNode::CalibratingNode(int frequency)
     // Publishers
     traj_pub_ = nh_.advertise<trajectory_msgs::JointTrajectory>("/floor/position_trajectory_controller/command", 2, false);
 
-    // Subscribers
-    device_sub_ = nh_.subscribe("/vive_node/tracked_devices", 1, &CalibratingNode::DevicesCb, this);
-
     // Services
     sample_client =  nh_.serviceClient<vive_calibrating::AddSample>("/vive_calibration/add_sample");
     compute_client = nh_.serviceClient<vive_calibrating::ComputeCalibration>("/vive_calibration/compute_calibration");
@@ -75,12 +72,12 @@ bool CalibratingNode::InitParams() {
       * Returns true if the parameters were retrieved from the server, false otherwise.
       */
 
-    if (nh_.param<std::string>("/vive_node/vr_frame", vr_frame, "world_vr") &&
-        nh_.param<std::string>("/vive_node/world_frame", world_frame, "root") &&
-        nh_.param<std::string>("/vive_calibrating_node/controller", controller_frame, "") &&
-        nh_.param<std::string>("/vive_calibrating_node/base_frame", base_frame, "floor_base") &&
-        nh_.param<std::string>("/vive_calibrating_node/tool_frame", tool_frame, "floor_tool0") &&
-        nh_.param<std::string>("/vive_calibrating_node/test_frame", test_frame, "controller_test") )
+    if (nh_.param<std::string>("/vive_node/vr_frame",                     vr_frame,         "world_vr") &&
+        nh_.param<std::string>("/vive_node/world_frame",                  world_frame,      "root") &&
+        nh_.param<std::string>("/vive_calibrating_node/controller_frame", controller_frame, "") &&
+        nh_.param<std::string>("/vive_calibrating_node/base_frame",       base_frame,       "floor_base") &&
+        nh_.param<std::string>("/vive_calibrating_node/tool_frame",       tool_frame,       "floor_tool0") &&
+        nh_.param<std::string>("/vive_calibrating_node/test_frame",       test_frame,       "controller_test") )
     {
         return true;
     } else {
@@ -96,22 +93,27 @@ bool CalibratingNode::Init() {
      */
 
     if (!InitParams() ) {
-        while (controller_frame.empty() && sigint_flag) {
-            ROS_INFO("Waiting for available VIVE controller...");
-            
-            ros::spinOnce();
-            ros::Duration(2.5).sleep();
-        }
-
         if (controller_frame.empty() ) {
-            return false;
+            device_sub_ = nh_.subscribe("/vive_node/tracked_devices", 1, &CalibratingNode::DevicesCb, this);
+
+            while (controller_frame.empty() && sigint_flag) {
+                ROS_INFO("Waiting for available VIVE controller...");
+                
+                ros::spinOnce();
+                ros::Duration(5.).sleep();
+            }
+
+            // Handle SIGINT
+            if (controller_frame.empty() ) {
+                return false;
+            }
         }
     }
     ROS_INFO_STREAM("Using " + controller_frame + " for calibration");
 
     std::string pError;
     if (!tf_buffer_.canTransform(vr_frame, controller_frame, ros::Time(0),
-                                 ros::Duration(5.0), &pError) )
+                                 ros::Duration(5.), &pError) )
     {
         ROS_ERROR_STREAM("Can't transform from " + vr_frame + " to " + controller_frame + ": " + pError);
 
@@ -120,10 +122,10 @@ bool CalibratingNode::Init() {
 
     // Parameter distributions for random poses
     r_dist = std::uniform_real_distribution<double>(1.2, 1.4);
-    theta_dist1 = std::uniform_real_distribution<double>(5.5 * M_PI_4, 6.5 * M_PI_4);
-    phi_dist1 = std::uniform_real_distribution<double>(0.5 * M_PI_4, 1.5 * M_PI_4);
-    theta_dist2 = std::uniform_real_distribution<double>(4.5 * M_PI_4, 7.5 * M_PI_4);
-    phi_dist2 = std::uniform_real_distribution<double>(1. * M_PI_4, 3. * M_PI_4);
+    theta_dist1 = std::uniform_real_distribution<double>(5.5  * M_PI_4, 6.5  * M_PI_4);
+    phi_dist1 =   std::uniform_real_distribution<double>(0.5  * M_PI_4, 1.5  * M_PI_4);
+    theta_dist2 = std::uniform_real_distribution<double>(5.   * M_PI_4, 7.   * M_PI_4);
+    phi_dist2 =   std::uniform_real_distribution<double>(1.25 * M_PI_4, 2.75 * M_PI_4);
 
     // Initialize transform headers
     tf_msg_pose_.header.frame_id = base_frame;
@@ -132,7 +134,7 @@ bool CalibratingNode::Init() {
     pose_msg_.header.frame_id = base_frame;
 
     if (!tf_buffer_.canTransform(test_frame, tool_frame, ros::Time(0),
-                                 ros::Duration(5.0), &pError) )
+                                 ros::Duration(5.), &pError) )
     {
         ROS_ERROR_STREAM("Can't transform from " + tool_frame + " to " + controller_frame + ": " + pError);
 
@@ -145,10 +147,11 @@ bool CalibratingNode::Init() {
         tf2::convert(tf_msg_X_inv_.transform, tf_X_inv_);
     }
 
-    ROS_INFO_STREAM(tf_msg_X_.transform);
-    ROS_INFO_STREAM(tf_msg_X_inv_.transform);
+    // ROS_INFO_STREAM(tf_msg_X_.transform);
+    // ROS_INFO_STREAM(tf_msg_X_inv_.transform);
 
-    joint_folded = {1.5707893454778887, -2.5900040327772613, 2.3999184786133068, -2.6179938779914945e-05, 0.799936756066561, 8.377580409572782e-05};
+    joints_folded = {1.5707893454778887, -2.5900040327772613, 2.3999184786133068, -2.6179938779914945e-05, 0.799936756066561, 8.377580409572782e-05};
+    joints_home = {1.5707718921853686, -1.5708155254166685, 1.5708399600261964, 0.0, 2.6179938779914945e-05, 0.0};
 
     std::vector<geometry_msgs::PoseStamped> test_poses_;
 
@@ -157,15 +160,15 @@ bool CalibratingNode::Init() {
     FillTestPlanePoses(test_poses_, base_frame, 0.25, 3, 0.7, -0.7, 1.2);
     FillTestPlanePoses(test_poses_, base_frame, 0.25, 3, 0.7, -0.7, 1.3);
 
-    // front
-    FillTestPlanePoses(test_poses_, base_frame, 0.25, 3, 0., -0.7, 1.1);
-    FillTestPlanePoses(test_poses_, base_frame, 0.25, 3, 0., -0.7, 1.2);
-    FillTestPlanePoses(test_poses_, base_frame, 0.25, 3, 0., -0.7, 1.3);
+    // // front
+    // FillTestPlanePoses(test_poses_, base_frame, 0.25, 3, 0., -0.7, 1.1);
+    // FillTestPlanePoses(test_poses_, base_frame, 0.25, 3, 0., -0.7, 1.2);
+    // FillTestPlanePoses(test_poses_, base_frame, 0.25, 3, 0., -0.7, 1.3);
 
-    // front right
-    FillTestPlanePoses(test_poses_, base_frame, 0.25, 3, -0.7, -0.7, 1.1);
-    FillTestPlanePoses(test_poses_, base_frame, 0.25, 3, -0.7, -0.7, 1.2);
-    FillTestPlanePoses(test_poses_, base_frame, 0.25, 3, -0.7, -0.7, 1.3);
+    // // front right
+    // FillTestPlanePoses(test_poses_, base_frame, 0.25, 3, -0.7, -0.7, 1.1);
+    // FillTestPlanePoses(test_poses_, base_frame, 0.25, 3, -0.7, -0.7, 1.2);
+    // FillTestPlanePoses(test_poses_, base_frame, 0.25, 3, -0.7, -0.7, 1.3);
 
     // // right
     // FillTestPlanePoses(test_poses_, base_frame, 0.25, 3, -0.7, 0., 1.1);
@@ -194,7 +197,7 @@ bool CalibratingNode::Init() {
 
     ExecuteTestPoses(test_poses_);
 
-    // MeasureRobot(100);
+    // MeasureRobot(5);
     return true;
 }
 
@@ -221,7 +224,9 @@ void CalibratingNode::DevicesCb(const vive_bridge::TrackedDevicesStamped& msg_) 
 
     for (int i = 0; i < msg_.device_count; i++) {
         if (msg_.device_classes[i] == msg_.CONTROLLER) {
-            controller_frame = msg_.device_frames[i];
+            if (controller_frame.empty() ) {
+                controller_frame = msg_.device_frames[i];
+            }
         }
     }
 }
@@ -269,8 +274,9 @@ void CalibratingNode::ExecuteTestPoses(std::vector<geometry_msgs::PoseStamped> &
     // Open a bag file for recording poses (named with iso-date)
     bag_.open("test_data_" + boost::posix_time::to_iso_string(ros::Time::now().toBoost() ) + ".bag",
               rosbag::bagmode::Write);
-    
-    move_group_.setJointValueTarget(joint_folded);
+    bag_.write("X", ros::Time::now(), tf_msg_X_);
+
+    move_group_.setJointValueTarget(joints_folded);
 
     ROS_INFO_STREAM("Moving robot to folded state");
     if (move_group_.move() ) {
@@ -282,10 +288,14 @@ void CalibratingNode::ExecuteTestPoses(std::vector<geometry_msgs::PoseStamped> &
         ROS_WARN_STREAM("Trajectory execution failed");
     }
 
-    bag_.write("X", ros::Time::now(), tf_msg_X_);
-
     for (std::vector<geometry_msgs::PoseStamped>::iterator it_ = poses_.begin(); it_ != poses_.end(); ++it_) {
         MoveRobot(*it_);
+
+        // Handle SIGINT
+        if (!sigint_flag) {
+            bag_.close();
+            break;
+        }
 
         std::string pError;
         if (tf_buffer_.canTransform(test_frame, controller_frame, ros::Time(0), &pError) &&
@@ -293,7 +303,7 @@ void CalibratingNode::ExecuteTestPoses(std::vector<geometry_msgs::PoseStamped> &
         {
             tf_msg_sensor_ = tf_buffer_.lookupTransform(test_frame, ros::Time(0), base_frame, ros::Time(0), base_frame);
             // tf_msg_diff_ = tf_buffer_.lookupTransform(controller_frame, test_frame, ros::Time(0) );
-            SampleSensor(controller_frame, test_frame, 120, 30, tf_msg_diff_);
+            SampleSensor(controller_frame, test_frame, 240, 30, tf_msg_diff_);
 
             bag_.write("FK_diff", ros::Time::now(), tf_msg_diff_);
             bag_.write("FK_sensor", ros::Time::now(), tf_msg_sensor_);
@@ -302,7 +312,7 @@ void CalibratingNode::ExecuteTestPoses(std::vector<geometry_msgs::PoseStamped> &
         }
     }
 
-    move_group_.setJointValueTarget(joint_folded);
+    move_group_.setJointValueTarget(joints_folded);
 
     ROS_INFO_STREAM("Moving robot to folded state");
     if (move_group_.move() ) {
@@ -364,7 +374,6 @@ bool CalibratingNode::MoveRobot(const geometry_msgs::PoseStamped &pose_) {
     tf_msg_pose_.header.stamp = ros::Time::now();
     static_tf_broadcaster_.sendTransform(tf_msg_pose_);
 
-
     move_group_.setPoseTarget(pose_);
 
     ROS_INFO_STREAM("Moving to pose:" << std::endl << pose_);
@@ -372,7 +381,7 @@ bool CalibratingNode::MoveRobot(const geometry_msgs::PoseStamped &pose_) {
         ROS_INFO_STREAM("Trajectory execution succeeded");
 
         move_group_.stop();
-        ros::Duration(5.).sleep();
+        ros::Duration(11.).sleep();
         return true;
     } else {
         ROS_WARN_STREAM("Trajectory execution failed");
@@ -423,6 +432,18 @@ void CalibratingNode::MeasureRobot(const int &N) {
     bag_.open("calib_data_" + boost::posix_time::to_iso_string(ros::Time::now().toBoost() ) + ".bag",
               rosbag::bagmode::Write);
 
+    move_group_.setJointValueTarget(joints_folded);
+
+    ROS_INFO_STREAM("Moving robot to folded state");
+    if (move_group_.move() ) {
+        ROS_INFO_STREAM("Trajectory execution succeeded");
+
+        move_group_.stop();
+        ros::Duration(0.5).sleep();
+    } else {
+        ROS_WARN_STREAM("Trajectory execution failed");
+    }
+
     GenerateRandomPose(pose_msg_.pose);
     pose_msg_.header.stamp = ros::Time::now();
     bag_.write("tool0_desired", ros::Time::now(), pose_msg_);
@@ -432,12 +453,12 @@ void CalibratingNode::MeasureRobot(const int &N) {
 
     std::string pError;
     if (tf_buffer_.canTransform(tool_frame, base_frame, ros::Time(0), &pError) &&
-        tf_buffer_.canTransform(controller_frame, vr_frame, ros::Time(0), &pError) )
+        tf_buffer_.canTransform(vr_frame, controller_frame, ros::Time(0), &pError) )
     {
         // Lookup and convert necessary transforms from msgs
         tf_msg_tool0_ = tf_buffer_.lookupTransform(base_frame, ros::Time(0), tool_frame, ros::Time(0), base_frame);
         // tf_msg_sensor_ = tf_buffer_.lookupTransform(vr_frame, ros::Time(0), controller_frame, ros::Time(0), vr_frame);
-        SampleSensor(vr_frame, controller_frame, 120, 30, tf_msg_sensor_);
+        SampleSensor(vr_frame, controller_frame, 240, 30, tf_msg_sensor_);
         bag_.write("tool0", ros::Time::now(), tf_msg_tool0_);
         bag_.write("sensor", ros::Time::now(), tf_msg_sensor_);
 
@@ -445,19 +466,25 @@ void CalibratingNode::MeasureRobot(const int &N) {
         tf2::convert(tf_msg_sensor_.transform, tf_sensor_[0]);
 
         for (int i = 1; i <= N; i++) {
+            // Handle SIGINT
+            if (!sigint_flag) {
+                bag_.close();
+                break;
+            }
+
             GenerateRandomPose(pose_msg_.pose);
             pose_msg_.header.stamp = ros::Time::now();
             bag_.write("tool0_desired", ros::Time::now(), pose_msg_);
 
             ROS_INFO_STREAM(i << "/" << N << std::endl);
             if (MoveRobot(pose_msg_) ) {
-                if (tf_buffer_.canTransform(tool_frame, base_frame, ros::Time(0), &pError) &&
-                    tf_buffer_.canTransform(controller_frame, vr_frame, ros::Time(0), &pError) )
+                if (tf_buffer_.canTransform(base_frame, tool_frame, ros::Time(0), &pError) &&
+                    tf_buffer_.canTransform(vr_frame, controller_frame, ros::Time(0), &pError) )
                 {
                     // Lookup and convert necessary transforms
                     tf_msg_tool0_ = tf_buffer_.lookupTransform(base_frame, ros::Time(0), tool_frame, ros::Time(0), base_frame);
                     // tf_msg_sensor_ = tf_buffer_.lookupTransform(vr_frame, ros::Time(0), controller_frame, ros::Time(0), vr_frame);
-                    SampleSensor(vr_frame, controller_frame, 120, 30, tf_msg_sensor_);
+                    SampleSensor(vr_frame, controller_frame, 240, 30, tf_msg_sensor_);
                     bag_.write("tool0", ros::Time::now(), tf_msg_tool0_);
                     bag_.write("sensor", ros::Time::now(), tf_msg_sensor_);
 
@@ -490,10 +517,34 @@ void CalibratingNode::MeasureRobot(const int &N) {
         ROS_WARN_STREAM("0/" << N << ": " << pError);
     }
 
+    move_group_.setJointValueTarget(joints_home);
+
+    ROS_INFO_STREAM("Moving robot to home state");
+    if (move_group_.move() ) {
+        ROS_INFO_STREAM("Trajectory execution succeeded");
+
+        move_group_.stop();
+        ros::Duration(0.5).sleep();
+    } else {
+        ROS_WARN_STREAM("Trajectory execution failed");
+    }
+
     if (CalibrateViveNode() ) {
 
     } else {
         ROS_ERROR("Failed solving the provided AX=XB problem");
+    }
+
+    move_group_.setJointValueTarget(joints_folded);
+
+    ROS_INFO_STREAM("Moving robot to folded state");
+    if (move_group_.move() ) {
+        ROS_INFO_STREAM("Trajectory execution succeeded");
+
+        move_group_.stop();
+        ros::Duration(0.5).sleep();
+    } else {
+        ROS_WARN_STREAM("Trajectory execution failed");
     }
 
     bag_.close();
@@ -511,10 +562,12 @@ bool CalibratingNode::CalibrateViveNode() {
         if (compute_srv.response.success) {
             geometry_msgs::TransformStamped tf_msg_Tx_ = compute_srv.response.X;
             tf_msg_Tx_.header.frame_id = tool_frame;
-            tf_msg_Tx_.child_frame_id = controller_frame;
+            tf_msg_Tx_.child_frame_id = test_frame;
             tf_msg_Tx_.header.stamp = ros::Time::now();
             bag_.write("X", ros::Time::now(), tf_msg_Tx_);
-            ROS_INFO_STREAM("T_X =" << std::endl << tf_msg_Tx_);
+            ROS_INFO_STREAM(tf_msg_Tx_);
+
+            static_tf_broadcaster_.sendTransform(tf_msg_Tx_);
 
             tf2::fromMsg(tf_msg_Tx_.transform, tf_X_);
 
@@ -522,11 +575,8 @@ bool CalibratingNode::CalibrateViveNode() {
             tf_msg_ = tf_buffer_.lookupTransform(world_frame, ros::Time(0), tool_frame, ros::Time(0), world_frame);
             tf2::fromMsg(tf_msg_.transform, tf_tool0_[1]);
 
-            tf_msg_ = tf_buffer_.lookupTransform(controller_frame, vr_frame, ros::Time(0) );
-            ROS_INFO_STREAM(tf_msg_);
-            SampleSensor(controller_frame, vr_frame, 120, 30, tf_msg_);
-            ROS_INFO_STREAM(tf_msg_);
-            
+            // tf_msg_ = tf_buffer_.lookupTransform(controller_frame, ros::Time(0), vr_frame, ros::Time(0), controller_frame);
+            SampleSensor(controller_frame, vr_frame, 240, 30, tf_msg_);
             tf2::fromMsg(tf_msg_.transform, tf_controller_);
 
             tf_controller_ = tf_tool0_[1]*tf_X_*tf_controller_;

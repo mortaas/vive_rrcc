@@ -21,6 +21,7 @@ find_package(catkin REQUIRED COMPONENTS
   moveit_ros_planning_interface
   rviz_visual_tools
   vive_bridge
+  sophus_ros_conversions
 )
 
 ## System dependencies are found with CMake's conventions
@@ -132,6 +133,7 @@ catkin_package(
     message_runtime
   DEPENDS
     sophus
+    sophus_ros_conversions
 )
 
 ###########
@@ -162,7 +164,7 @@ add_executable(simple_calibrating_node src/simple_calibrating_node.cpp)
 add_executable(manual_calibrating_node src/manual_calibrating_node.cpp)
 add_executable(vive_robot_calibrating_node src/vive_robot_calibrating_node.cpp)
 add_executable(parkmartin_node src/parkmartin_node.cpp)
-add_executable(cal_test src/cal_test.cpp)
+add_executable(simple_calibration_test src/simple_calibration_test.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -187,7 +189,7 @@ target_link_libraries(vive_robot_calibrating_node
 target_link_libraries(parkmartin_node
   ${catkin_LIBRARIES}
 )
-target_link_libraries(cal_test
+target_link_libraries(simple_calibration_test
   ${catkin_LIBRARIES}
 )
 

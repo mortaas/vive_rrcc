@@ -52,7 +52,7 @@ class ViveNode {
     ros::Rate loop_rate_;
 
     // Parameters
-    std::string inertial_frame, vr_frame;
+    std::string world_frame, vr_frame;
     double vr_x_offset,   vr_y_offset,     vr_z_offset,
            vr_yaw_offset, vr_pitch_offset, vr_roll_offset;
     bool InitParams();
