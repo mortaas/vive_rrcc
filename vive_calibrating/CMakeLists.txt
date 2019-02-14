@@ -4,6 +4,13 @@ project(vive_calibrating)
 ## Compile as C++11, supported in ROS Kinetic and newer
 add_compile_options(-std=c++11)
 
+# Sophus - C++ implementation of Lie Groups using Eigen
+## Set Sophus headers path
+## ENV reads paths from a system environment variable
+set(SOPHUS "$ENV{HOME}/lib/sophus")
+set(sophus_INCLUDE_DIRS ${SOPHUS})
+find_package(Sophus 1.0.0 EXACT REQUIRED PATHS ${SOPHUS}/build NO_DEFAULT_PATH)
+
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
@@ -27,23 +34,14 @@ find_package(catkin REQUIRED COMPONENTS
 ## System dependencies are found with CMake's conventions
 find_package(Boost REQUIRED COMPONENTS system)
 
-find_package(Eigen3 REQUIRED)
-# Eigen 3.2 (Wily) only provides EIGEN3_INCLUDE_DIR, not EIGEN3_INCLUDE_DIRS
-if(NOT EIGEN3_INCLUDE_DIRS)
-  set(EIGEN3_INCLUDE_DIRS ${EIGEN3_INCLUDE_DIR})
-endif()
-
-# Sophus - C++ implementation of Lie Groups using Eigen
-# find_package(catkin REQUIRED COMPONENTS
-#   ecl_linear_algebra
-#   ecl_time
-#   dslam_common
-# )
-find_package(sophus REQUIRED)
+# find_package(Eigen3 REQUIRED)
+# # Eigen 3.2 (Wily) only provides EIGEN3_INCLUDE_DIR, not EIGEN3_INCLUDE_DIRS
+# if(NOT EIGEN3_INCLUDE_DIRS)
+#   set(EIGEN3_INCLUDE_DIRS ${EIGEN3_INCLUDE_DIR})
+# endif()
 
 # Ceres solver
 find_package(Ceres REQUIRED)
-
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -133,9 +131,10 @@ catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES vive_calibrating
   CATKIN_DEPENDS
+    roscpp
     message_runtime
+    eigen
   DEPENDS
-    sophus
     sophus_ros_conversions
 )
 
@@ -148,6 +147,7 @@ catkin_package(
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}
+  ${sophus_INCLUDE_DIRS}
   ${CERES_INCLUDE_DIRS}
 )
 
@@ -169,6 +169,7 @@ add_executable(manual_calibrating_node src/manual_calibrating_node.cpp)
 add_executable(vive_robot_calibrating_node src/vive_robot_calibrating_node.cpp)
 add_executable(parkmartin_node src/parkmartin_node.cpp)
 add_executable(simple_calibration_test src/simple_calibration_test.cpp)
+# add_executable(ceres_test src/test_ceres_se3.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -194,6 +195,10 @@ target_link_libraries(parkmartin_node
   ${catkin_LIBRARIES}
   ${CERES_LIBRARIES}
 )
+# target_link_libraries(ceres_test
+#   ${catkin_LIBRARIES}
+#   ${CERES_LIBRARIES}
+# )
 target_link_libraries(simple_calibration_test
   ${catkin_LIBRARIES}
 )

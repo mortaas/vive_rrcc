@@ -195,9 +195,9 @@ bool CalibratingNode::Init() {
     // FillTestPlanePoses(test_poses_, base_frame, 0.25, 3, 0.7, 0., 1.2);
     // FillTestPlanePoses(test_poses_, base_frame, 0.25, 3, 0.7, 0., 1.3);
 
-    ExecuteTestPoses(test_poses_);
+    // ExecuteTestPoses(test_poses_);
 
-    // MeasureRobot(5);
+    MeasureRobot(5);
     return true;
 }
 

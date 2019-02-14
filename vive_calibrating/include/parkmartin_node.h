@@ -38,7 +38,7 @@ class ParkMartinNode {
     std::vector<Sophus::SE3f> sophus_Ta_, sophus_Tb_;
     // Solution
     Sophus::SO3f sophus_Rx_;
-    Sophus::Vector3f sophus_tx_;
+    Sophus::SE3f::Point sophus_tx_;
     Sophus::SE3f sophus_Tx_;
 
     int n_samples;
