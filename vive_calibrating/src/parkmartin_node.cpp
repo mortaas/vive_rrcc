@@ -1,4 +1,6 @@
 #include "parkmartin_node.h"
+// #include "local_parameterization_se3.hpp"
+
 
 ParkMartinNode::ParkMartinNode(int frequency)
     : loop_rate_(frequency)
@@ -170,6 +172,13 @@ void ParkMartinNode::ParkMartinExample() {
     ParkMartin();
 
     ROS_INFO_STREAM(tf_X_);
+}
+
+bool ParkMartinNode::HoraudDornaika() {
+    // Parameters
+    Sophus::SE3f T_x = sophus_Tx_;
+
+    ceres::Problem problem;
 }
 
 

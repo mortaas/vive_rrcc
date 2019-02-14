@@ -20,6 +20,9 @@
 #include "sophus_ros_conversions/eigen.hpp"
 #include "sophus_ros_conversions/geometry.hpp"
 
+// Ceres solver
+#include <ceres/ceres.h>
+
 
 class ParkMartinNode {
     ros::NodeHandle nh_;
@@ -46,6 +49,7 @@ class ParkMartinNode {
                             vive_calibrating::ComputeCalibration::Response &res);
     
     bool ParkMartin();
+    bool HoraudDornaika();
     void ParkMartinExample();
 
     public:

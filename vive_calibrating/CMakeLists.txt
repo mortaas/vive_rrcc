@@ -41,6 +41,9 @@ endif()
 # )
 find_package(sophus REQUIRED)
 
+# Ceres solver
+find_package(Ceres REQUIRED)
+
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -145,6 +148,7 @@ catkin_package(
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}
+  ${CERES_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
@@ -188,6 +192,7 @@ target_link_libraries(vive_robot_calibrating_node
 )
 target_link_libraries(parkmartin_node
   ${catkin_LIBRARIES}
+  ${CERES_LIBRARIES}
 )
 target_link_libraries(simple_calibration_test
   ${catkin_LIBRARIES}
