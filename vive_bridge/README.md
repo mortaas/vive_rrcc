@@ -165,7 +165,7 @@ The position and orientation (pose) of each device is defined relative to the *w
 
 ```rosrun rqt_reconfigure rqt_reconfigure```.
 
-The parameters from [dynamic_reconfigure](http://wiki.ros.org/dynamic_reconfigure) are currently not saved automatically, and they therefore have to be updated manually in the ```/launch/vive_launch.launch``` file (see [param](http://wiki.ros.org/roslaunch/XML/param)), and in the ```/cfg/DynReconf.cfg``` file (see [How to Write Your First .cfg File](http://wiki.ros.org/dynamic_reconfigure/Tutorials/HowToWriteYourFirstCfgFile)).
+The parameters from [dynamic_reconfigure](http://wiki.ros.org/dynamic_reconfigure) are saved and loaded automatically from the ```/cfg/dynparam.yaml``` file.
 
 ### Coordinate systems
 
@@ -186,8 +186,7 @@ The VIVE Tracker coordinate system is rotated 180&deg; around the x-axis such th
 ## Compatibility
 
 The package was tested with:
-* HTC VIVE with OpenVR SDK 1.0.15 and Ubuntu 16.04 LTS running ROS Kinetic Kame (1.12.13)
+* HTC VIVE with OpenVR SDK 1.2.10 and Ubuntu 16.04 LTS running ROS Kinetic Kame (1.12.13)
 
 
 ## To-do list
-* Save and load the parameters that are changed by dynamic reconfigure

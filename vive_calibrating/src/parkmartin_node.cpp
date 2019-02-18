@@ -68,7 +68,6 @@ bool ParkMartinNode::ComputeCalibration(vive_calibrating::ComputeCalibration::Re
     if (n_samples >= 2) {
         // Solve AX=XB for transformation X from wrist to sensor
         ParkMartin();
-        // HoraudDornaika();
 
         // Clean up
         n_samples = 0;
@@ -118,10 +117,14 @@ bool ParkMartinNode::ParkMartin()
 
     Eigen::JacobiSVD<Eigen::Matrix3f> svd_(eigen_M_.transpose() * eigen_M_,
                                            Eigen::ComputeFullU | Eigen::ComputeFullV);
-    sophus_Rx_ = Sophus::SO3f(svd_.matrixU() * ((((
-                              svd_.singularValues() ).cwiseSqrt() ).cwiseInverse() ).asDiagonal() ).toDenseMatrix() *
-                              svd_.matrixV().transpose() *
-                              eigen_M_.transpose() );
+    Eigen::Matrix3f eigen_Rx_ = svd_.matrixU() * ((((
+                                svd_.singularValues() ).cwiseSqrt() ).cwiseInverse() ).asDiagonal() ).toDenseMatrix() *
+                                svd_.matrixV().transpose() *
+                                eigen_M_.transpose();
+
+    // Ensure that the rotation matrix is orthogonal with determinant 1
+    Eigen::Quaternionf eigen_Qx_ = Eigen::Quaternionf(eigen_Rx_);
+    sophus_Rx_ = Sophus::SO3f(eigen_Qx_);
 
     for (int i = 0; i < n_samples; i++) {
         eigen_C_.block<3, 3>(3*i, 0) = Eigen::Matrix3f::Identity() - sophus_Ta_[i].so3().matrix();
@@ -171,10 +174,10 @@ void ParkMartinNode::ParkMartinExample() {
 
     // Solve AX=XB for transformation X from wrist to sensor
     ParkMartin();
-    HoraudDornaika();
 
     ROS_INFO_STREAM(tf_X_);
 }
+
 
 namespace Eigen {
     namespace internal {
@@ -189,23 +192,46 @@ namespace Eigen {
     }  // namespace internal
 }  // namespace Eigen
 
+// struct TestCostFunctor {
+//     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+//     TestCostFunctor(Sophus::SE3d T_x) : T_x(T_x) {}
+
+//     template <class T>
+//     bool operator()(T const* const sT_a, T const* const sT_b,
+//                     T* sResiduals) const
+//     {
+//         Eigen::Map<Sophus::SE3<T> const> const T_a(sT_a);
+//         Eigen::Map<Sophus::SE3<T> const> const T_b(sT_b);
+
+//         // Eigen::Map<Eigen::Matrix<T, 3, 1> > residuals(sResiduals);
+
+//         sResiduals[0] = (T_b.so3().log() - T_x.cast<T>().so3()*T_a.so3().log() ).squaredNorm() +
+//                         (T_x.cast<T>().so3()*T_a.so3().log() -
+//                          T_b.so3().matrix()*T_x.cast<T>().translation() - T_x.cast<T>().translation() +
+//                          T_b.translation() ).squaredNorm() +
+//                     1e6*(1. - T_x.cast<T>().so3().params().squaredNorm() )*
+//                         (1. - T_x.cast<T>().so3().params().squaredNorm() );
+
+//         return true;
+//     }
+
+//     Sophus::SE3d T_x;
+// };
+
 struct TestCostFunctor {
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     TestCostFunctor(Sophus::SE3d T_x) : T_x(T_x) {}
 
     template <class T>
     bool operator()(T const* const sT_a, T const* const sT_b,
-                    T* residual) const
+                    T* sResiduals) const
     {
         Eigen::Map<Sophus::SE3<T> const> const T_a(sT_a);
         Eigen::Map<Sophus::SE3<T> const> const T_b(sT_b);
 
-        residual[0] =  (T_b.so3().log() - T_x.cast<T>().so3()*T_a.so3().log() ).squaredNorm() +
-                       (T_x.cast<T>().so3()*T_a.so3().log() -
-                       (T_b.so3().matrix() - Eigen::Matrix<T, 3, 3>::Identity() )*T_x.cast<T>().translation() -
-                        T_b.translation() ).squaredNorm() +
-                        T(1e6) * (T(1.) - T_x.cast<T>().so3().params().squaredNorm() )*
-                                 (T(1.) - T_x.cast<T>().so3().params().squaredNorm() );
+        Eigen::Map<Eigen::Matrix<T, 6, 1> > residuals(sResiduals);
+
+        residuals = ((T_a*T_x.cast<T>() ).inverse()*(T_x.cast<T>()*T_b) ).log();
 
         return true;
     }
@@ -223,7 +249,7 @@ bool ParkMartinNode::HoraudDornaika() {
                               new Sophus::test::LocalParameterizationSE3);
 
     ceres::CostFunction* cost_function =
-        new ceres::AutoDiffCostFunction<TestCostFunctor, 1,
+        new ceres::AutoDiffCostFunction<TestCostFunctor, Sophus::SE3d::DoF,
                                         Sophus::SE3d::num_parameters, Sophus::SE3d::num_parameters>
                                        (new TestCostFunctor(T_x) );
     for (int i = 0; i < n_samples; i++) {
@@ -233,17 +259,18 @@ bool ParkMartinNode::HoraudDornaika() {
 
     // Set solver options (precision / method)
     ceres::Solver::Options options;
-    options.gradient_tolerance = 0.01 * Sophus::Constants<double>::epsilon();
-    options.function_tolerance = 0.01 * Sophus::Constants<double>::epsilon();
+    options.jacobi_scaling = true;
+    options.gradient_tolerance = 0.1 * Sophus::Constants<double>::epsilon();
+    options.function_tolerance = 0.1 * Sophus::Constants<double>::epsilon();
     options.linear_solver_type = ceres::DENSE_QR;
 
     // Solve
     ceres::Solver::Summary summary;
     Solve(options, &problem, &summary);
-    ROS_INFO_STREAM(summary.BriefReport() << std::endl);
+    ROS_INFO_STREAM(summary.FullReport() << std::endl);
 
-    tf_X_.transform = sophus_ros_conversions::sophusToTransformMsg(T_x.cast<float>() );
-    tf_X_.header.stamp = ros::Time::now();
+    // tf_X_.transform = sophus_ros_conversions::sophusToTransformMsg(T_x.cast<float>() );
+    // tf_X_.header.stamp = ros::Time::now();
 }
 
 

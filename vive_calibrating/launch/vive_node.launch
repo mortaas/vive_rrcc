@@ -1,10 +1,12 @@
 <?xml version="1.0"?>
 
 <launch>
-    <rosparam param="/vive_calibrating_node/controller_frame">"controller_LHR_FDBBBBC0"</rosparam>
+    <rosparam param="/vive_calibrating_node/controller_frame">"controller_LHR_FDB9BFC4"</rosparam>
     <rosparam param="/vive_calibrating_node/base_frame">"floor_base"</rosparam>
     <rosparam param="/vive_calibrating_node/tool_frame">"floor_tool0"</rosparam>
     <rosparam param="/vive_calibrating_node/test_frame">"controller_test"</rosparam>
+    <rosparam param="/vive_calibrating_node/joints_folded">"[1.5707893454778887, -2.5900040327772613, 2.3999184786133068, -2.6179938779914945e-05, 0.799936756066561, 8.377580409572782e-05]"</rosparam>
+    <rosparam param="/vive_calibrating_node/joints_home">"[1.5707718921853686, -1.5708155254166685, 1.5708399600261964, 0.0, 2.6179938779914945e-05, 0.0]"</rosparam>
 
     <!-- <node pkg="tf2_ros" type="static_transform_publisher" name="static_tracker1_publisher" args="-0.124 0.046 0.025 0.0 -1.57079632679 0.0 camera_house tracker1_desired" />
     <node pkg="tf2_ros" type="static_transform_publisher" name="static_tracker2_publisher" args="0.124 0.046 0.025 0.0 1.57079632679 0.0 camera_house tracker2_desired" /> -->

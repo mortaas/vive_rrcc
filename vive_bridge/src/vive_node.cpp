@@ -166,13 +166,7 @@ bool ViveNode::InitParams() {
                                    "package://vive_bridge/meshes/lh_basestation_vive/lh_basestation_vive.dae")       &&
             
             nh_.param<std::string>("/vive_node/world_frame", world_frame,       "root")     &&
-            nh_.param<std::string>("/vive_node/vr_frame",    vr_frame,          "world_vr") &&
-            nh_.param("/vive_node/vr_x_offset",              vr_x_offset,       0.0) &&
-            nh_.param("/vive_node/vr_y_offset",              vr_y_offset,       0.0) &&
-            nh_.param("/vive_node/vr_z_offset",              vr_z_offset,       0.0) &&
-            nh_.param("/vive_node/vr_yaw_offset",            vr_yaw_offset,     0.0) &&
-            nh_.param("/vive_node/vr_pitch_offset",          vr_pitch_offset,   0.0) &&
-            nh_.param("/vive_node/vr_roll_offset",           vr_roll_offset,    0.0) );
+            nh_.param<std::string>("/vive_node/vr_frame",    vr_frame,          "world_vr") );
 }
 
 void ViveNode::ReconfCallback(vive_bridge::ViveConfig &config, uint32_t level) {
@@ -186,7 +180,7 @@ void ViveNode::ReconfCallback(vive_bridge::ViveConfig &config, uint32_t level) {
     vr_yaw_offset      = config.vr_yaw_offset;
     vr_pitch_offset    = config.vr_pitch_offset;
     vr_roll_offset     = config.vr_roll_offset;
-
+    
     SendOffsetTransform();
 }
 
@@ -275,19 +269,22 @@ bool ViveNode::Init(int argc, char **argv) {
      */
 
     if (vr_.Init(argc, argv) ) {
-        if (!InitParams() ) {
-            ROS_WARN_STREAM("Failed to get parameters from the parameter server.");
-            ROS_WARN_STREAM("Using default parameters.");
-        }
+        PACKAGE_PATH = ros::package::getPath("vive_bridge");
+        NODE_NAME = ros::this_node::getName();
 
-        vr_offset_msg_.header.frame_id = world_frame;
-        vr_offset_msg_.child_frame_id = vr_frame;
+        // System commands for dumping and loading dynamic reconfigure parameters
+        // Temporary workaround as there is no C++ API for dynamic reconfigure
+        cmd_dynparam_dump = "rosrun dynamic_reconfigure dynparam dump " + NODE_NAME + 
+                            " " + PACKAGE_PATH + "/cfg/dynparam.yaml";
+
+        if (!InitParams() ) {
+            ROS_WARN_STREAM("Failed to get parameters from the parameter server. \n" <<
+                            "Using default parameters.");
+        }
 
         // Set dynamic reconfigure callback function
         callback_type_ = boost::bind(&ViveNode::ReconfCallback, this, _1, _2);
         reconf_server_.setCallback(callback_type_);
-
-        // SendOffsetTransform();
 
         // Offset transform message headers
         vr_offset_msg_.header.frame_id = world_frame;
@@ -349,6 +346,9 @@ void ViveNode::Shutdown() {
       /**
      * Shuts down the connection to the VR hardware and cleans up the OpenVR API
      */
+
+    // Dump dynamic reconfigure parameters
+    system(cmd_dynparam_dump.c_str() );
 
     vr_.Shutdown();
     ros::shutdown();

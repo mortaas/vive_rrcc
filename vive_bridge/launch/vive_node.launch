@@ -11,12 +11,8 @@
     <rosparam param="/vive_node/world_frame">"root"</rosparam>
     <rosparam param="/vive_node/vr_frame">"world_vr"</rosparam>
 
-    <!-- <rosparam param="/vive_node/vr_x_offset">-1.89223626887731</rosparam>
-    <rosparam param="/vive_node/vr_y_offset">-2.608765797841659</rosparam>
-    <rosparam param="/vive_node/vr_z_offset">2.9165620246814097</rosparam>
-    <rosparam param="/vive_node/vr_yaw_offset">-0.607716823926031</rosparam>
-    <rosparam param="/vive_node/vr_pitch_offset">0.01411116306491677</rosparam>
-    <rosparam param="/vive_node/vr_roll_offset">1.571784220099083</rosparam> -->
+    <!-- Load dynamic reconfigure parameters -->
+    <node name="vive_dynparam" pkg="dynamic_reconfigure" type="dynparam" args="load vive_node $(find vive_bridge)/cfg/dynparam.yaml"/>
 
     <!-- Launch node through steam with shell script -->
     <node name="vive_node" pkg="vive_bridge" type="launch.sh" output="screen" required="true"/>

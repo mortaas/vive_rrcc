@@ -2,6 +2,7 @@
 
 // ROS
 #include <ros/ros.h>
+#include <ros/package.h>
 // ROS msgs
 #include <geometry_msgs/TransformStamped.h>
 #include <geometry_msgs/TwistStamped.h>
@@ -51,11 +52,15 @@ class ViveNode {
     ros::NodeHandle nh_;
     ros::Rate loop_rate_;
 
+    std::string PACKAGE_PATH, NODE_NAME;
+
     // Parameters
     std::string world_frame, vr_frame;
     double vr_x_offset,   vr_y_offset,     vr_z_offset,
            vr_yaw_offset, vr_pitch_offset, vr_roll_offset;
     bool InitParams();
+
+    std::string cmd_dynparam_dump;
 
     // Dynamic reconfigure
     dynamic_reconfigure::Server<vive_bridge::ViveConfig> reconf_server_;
