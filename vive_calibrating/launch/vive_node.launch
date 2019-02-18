@@ -8,9 +8,6 @@
     <rosparam param="/vive_calibrating_node/joints_folded">"[1.5707893454778887, -2.5900040327772613, 2.3999184786133068, -2.6179938779914945e-05, 0.799936756066561, 8.377580409572782e-05]"</rosparam>
     <rosparam param="/vive_calibrating_node/joints_home">"[1.5707718921853686, -1.5708155254166685, 1.5708399600261964, 0.0, 2.6179938779914945e-05, 0.0]"</rosparam>
 
-    <!-- <node pkg="tf2_ros" type="static_transform_publisher" name="static_tracker1_publisher" args="-0.124 0.046 0.025 0.0 -1.57079632679 0.0 camera_house tracker1_desired" />
-    <node pkg="tf2_ros" type="static_transform_publisher" name="static_tracker2_publisher" args="0.124 0.046 0.025 0.0 1.57079632679 0.0 camera_house tracker2_desired" /> -->
-
     <node name="parkmartin_node" pkg="vive_calibrating" type="parkmartin_node" output="screen" required="true"/>
     <node name="vive_robot_calibrating_node" pkg="vive_calibrating" type="vive_robot_calibrating_node" output="screen" required="true"/>
 </launch>

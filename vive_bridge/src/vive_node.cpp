@@ -282,13 +282,13 @@ bool ViveNode::Init(int argc, char **argv) {
                             "Using default parameters.");
         }
 
-        // Set dynamic reconfigure callback function
-        callback_type_ = boost::bind(&ViveNode::ReconfCallback, this, _1, _2);
-        reconf_server_.setCallback(callback_type_);
-
         // Offset transform message headers
         vr_offset_msg_.header.frame_id = world_frame;
         vr_offset_msg_.child_frame_id = vr_frame;
+
+        // Set dynamic reconfigure callback function
+        callback_type_ = boost::bind(&ViveNode::ReconfCallback, this, _1, _2);
+        reconf_server_.setCallback(callback_type_);
 
         // Initialize rviz_visual_tools for publishing tracked device meshes to RViz
         visual_tools_.reset(new rviz_visual_tools::RvizVisualTools(world_frame, "rviz_mesh_markers") );
