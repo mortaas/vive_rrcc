@@ -45,8 +45,6 @@ CalibrationTestNode::CalibrationTestNode(int frequency):
 {   
     // Publisher
     pose_pub_ = nh_.advertise<geometry_msgs::PoseStamped>("pose_diff", 10, true);
-
-    pose_diff_.header.frame_id = "controller_test";
 }
 CalibrationTestNode::~CalibrationTestNode() {
 }
@@ -73,10 +71,16 @@ bool CalibrationTestNode::Init() {
      * Initialize the node
      */
 
-    while (!tf_buffer_.canTransform("controller_test", "controller_LHR_FDB9BFC4", ros::Time(0) ) ) {
+    InitParams();
+
+    pose_diff_.header.frame_id = test_frame;
+
+    while (!tf_buffer_.canTransform(test_frame, controller_frame, ros::Time(0) ) ) {
         ros::spinOnce();
         ros::Duration(1.0).sleep();
     }
+
+    ROS_INFO_STREAM("Using " + controller_frame + " for test");
 
     return true;
 }
@@ -86,7 +90,7 @@ void CalibrationTestNode::Loop() {
      * Main loop of the node
      */
 
-    tf_msg_diff_ = tf_buffer_.lookupTransform("controller_LHR_FDB9BFC4", "controller_test", ros::Time(0) );
+    tf_msg_diff_ = tf_buffer_.lookupTransform(controller_frame, test_frame, ros::Time(0) );
     tf2::fromMsg(tf_msg_diff_.transform, tf_diff_);
     tf2::toMsg(tf_diff_, pose_diff_.pose);
 
@@ -108,7 +112,7 @@ void CalibrationTestNode::Shutdown() {
 int main(int argc, char** argv) {
     ros::init(argc, argv, "cal_test");
 
-    CalibrationTestNode node_(240);
+    CalibrationTestNode node_(120);
 
     if (!node_.Init() ) {
         exit(EXIT_FAILURE);

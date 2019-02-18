@@ -77,7 +77,8 @@ bool CalibratingNode::InitParams() {
         nh_.param<std::string>("/vive_calibrating_node/controller_frame", controller_frame, "") &&
         nh_.param<std::string>("/vive_calibrating_node/base_frame",       base_frame,       "floor_base") &&
         nh_.param<std::string>("/vive_calibrating_node/tool_frame",       tool_frame,       "floor_tool0") &&
-        nh_.param<std::string>("/vive_calibrating_node/test_frame",       test_frame,       "controller_test") )
+        nh_.param<std::string>("/vive_calibrating_node/test_frame",       test_frame,       "controller_test") &&
+        nh_.getParam("/vive_calibrating_node/joints_folded", joints_folded) )
     {
         return true;
     } else {
@@ -91,6 +92,8 @@ bool CalibratingNode::Init() {
       /**
      * Initialize the node and check if the necessary transforms are available
      */
+
+    joints_folded = {1.5707893454778887, -2.5900040327772613, 2.3999184786133068, -2.6179938779914945e-05, 0.799936756066561, 8.377580409572782e-05};
 
     if (!InitParams() ) {
         if (controller_frame.empty() ) {
@@ -149,9 +152,6 @@ bool CalibratingNode::Init() {
 
     // ROS_INFO_STREAM(tf_msg_X_.transform);
     // ROS_INFO_STREAM(tf_msg_X_inv_.transform);
-
-    joints_folded = {1.5707893454778887, -2.5900040327772613, 2.3999184786133068, -2.6179938779914945e-05, 0.799936756066561, 8.377580409572782e-05};
-    joints_home = {1.5707718921853686, -1.5708155254166685, 1.5708399600261964, 0.0, 2.6179938779914945e-05, 0.0};
 
     std::vector<geometry_msgs::PoseStamped> test_poses_;
 
@@ -292,7 +292,7 @@ void CalibratingNode::ExecuteTestPoses(std::vector<geometry_msgs::PoseStamped> &
 
     for (std::vector<geometry_msgs::PoseStamped>::iterator it_ = poses_.begin(); it_ != poses_.end(); ++it_) {
         ptrdiff_t i = std::distance(poses_.begin(), it_) + 1;
-        ROS_INFO_STREAM(i << "/" << N << std::endl);
+        ROS_INFO_STREAM(i << "/" << N);
         MoveRobot(*it_);
 
         // Handle SIGINT
@@ -304,10 +304,11 @@ void CalibratingNode::ExecuteTestPoses(std::vector<geometry_msgs::PoseStamped> &
         if (tf_buffer_.canTransform(test_frame, controller_frame, ros::Time(0), &pError) &&
             tf_buffer_.canTransform(test_frame, base_frame, ros::Time(0), &pError) )
         {
-            tf_msg_sensor_ = tf_buffer_.lookupTransform(test_frame, ros::Time(0), base_frame, ros::Time(0), base_frame);
             tf_msg_diff_ = tf_buffer_.lookupTransform(controller_frame, test_frame, ros::Time(0) );
             SampleSensor(controller_frame, test_frame, 120, 30, tf_msg_diff_);
+            tf_msg_sensor_ = tf_buffer_.lookupTransform(test_frame, ros::Time(0), base_frame, ros::Time(0), base_frame);
 
+            ROS_INFO_STREAM(tf_msg_sensor_);
             ROS_INFO_STREAM(tf_msg_diff_);
 
             bag_.write("FK_sensor", ros::Time::now(), tf_msg_sensor_);
@@ -386,7 +387,7 @@ bool CalibratingNode::MoveRobot(const geometry_msgs::PoseStamped &pose_) {
         ROS_INFO_STREAM("Trajectory execution succeeded");
 
         move_group_.stop();
-        ros::Duration(11.).sleep();
+        ros::Duration(22.).sleep();
         return true;
     } else {
         ROS_WARN_STREAM("Trajectory execution failed");
@@ -453,7 +454,7 @@ void CalibratingNode::MeasureRobot(const int &N) {
     pose_msg_.header.stamp = ros::Time::now();
     bag_.write("tool0_desired", ros::Time::now(), pose_msg_);
 
-    ROS_INFO_STREAM("0/" << N << std::endl);
+    ROS_INFO_STREAM("0/" << N);
     MoveRobot(pose_msg_);
 
     std::string pError;
@@ -480,7 +481,7 @@ void CalibratingNode::MeasureRobot(const int &N) {
             pose_msg_.header.stamp = ros::Time::now();
             bag_.write("tool0_desired", ros::Time::now(), pose_msg_);
 
-            ROS_INFO_STREAM(i << "/" << N << std::endl);
+            ROS_INFO_STREAM(i << "/" << N);
             if (MoveRobot(pose_msg_) ) {
                 if (tf_buffer_.canTransform(base_frame, tool_frame, ros::Time(0), &pError) &&
                     tf_buffer_.canTransform(vr_frame, controller_frame, ros::Time(0), &pError) )
@@ -521,20 +522,17 @@ void CalibratingNode::MeasureRobot(const int &N) {
         ROS_WARN_STREAM("0/" << N << ": " << pError);
     }
 
+    move_group_.setJointValueTarget(joints_folded);
 
-    move_group_.setJointValueTarget(joints_home);
-
-    ROS_INFO_STREAM("Moving robot to home state");
+    ROS_INFO_STREAM("Moving robot to folded state");
     if (move_group_.move() ) {
         ROS_INFO_STREAM("Trajectory execution succeeded");
 
         move_group_.stop();
-        ros::Duration(0.5).sleep();
+        ros::Duration(44.).sleep();
     } else {
         ROS_WARN_STREAM("Trajectory execution failed");
     }
-
-    ros::Duration(0.5).sleep();
 
     if (CalibrateViveNode() ) {
 
@@ -544,18 +542,6 @@ void CalibratingNode::MeasureRobot(const int &N) {
 
     bag_.write("tool0", ros::Time::now(), tf_msg_tool0_);
     bag_.write("sensor", ros::Time::now(), tf_msg_sensor_);
-
-    move_group_.setJointValueTarget(joints_folded);
-
-    ROS_INFO_STREAM("Moving robot to folded state");
-    if (move_group_.move() ) {
-        ROS_INFO_STREAM("Trajectory execution succeeded");
-
-        move_group_.stop();
-        ros::Duration(0.5).sleep();
-    } else {
-        ROS_WARN_STREAM("Trajectory execution failed");
-    }
 
     bag_.close();
 }
@@ -575,7 +561,7 @@ bool CalibratingNode::CalibrateViveNode() {
             tf_msg_Tx_.child_frame_id = test_frame;
             tf_msg_Tx_.header.stamp = ros::Time::now();
             bag_.write("X", ros::Time::now(), tf_msg_Tx_);
-            ROS_INFO_STREAM(tf_msg_Tx_ << std::endl);
+            ROS_INFO_STREAM(tf_msg_Tx_);
             ROS_INFO_STREAM("rosrun tf2_ros static_transform_publisher " << tf_msg_Tx_.transform.translation.x << " "
                                                                          << tf_msg_Tx_.transform.translation.y << " "
                                                                          << tf_msg_Tx_.transform.translation.z << " "
@@ -583,7 +569,7 @@ bool CalibratingNode::CalibrateViveNode() {
                                                                          << tf_msg_Tx_.transform.rotation.y << " "
                                                                          << tf_msg_Tx_.transform.rotation.z << " "
                                                                          << tf_msg_Tx_.transform.rotation.w
-                                                                         << " floor_tool0 controller_test" << std::endl);
+                                                                         << " floor_tool0 controller_test");
 
             static_tf_broadcaster_.sendTransform(tf_msg_Tx_);
 
