@@ -150,25 +150,25 @@ bool CalibratingNode::Init() {
         tf2::convert(tf_msg_X_inv_.transform, tf_X_inv_);
     }
 
-    // ROS_INFO_STREAM(tf_msg_X_.transform);
-    // ROS_INFO_STREAM(tf_msg_X_inv_.transform);
-
     std::vector<geometry_msgs::PoseStamped> test_poses_;
 
-    // front left
-    FillTestPlanePoses(test_poses_, base_frame, 0.3, 4, 0.8, -0.8, 1.1);
-    FillTestPlanePoses(test_poses_, base_frame, 0.3, 4, 0.8, -0.8, 1.2);
-    FillTestPlanePoses(test_poses_, base_frame, 0.3, 4, 0.8, -0.8, 1.3);
+    FillTestPlanePoses(test_poses_, base_frame, 0.5, 2,  1., -1.0, 1.2);
+    FillTestPlanePoses(test_poses_, base_frame, 0.5, 2, -1., -1.0, 1.2);
+
+    // // front left
+    // FillTestPlanePoses(test_poses_, base_frame, 0.3, 4, 0.8, -0.8, 1.1);
+    // FillTestPlanePoses(test_poses_, base_frame, 0.3, 4, 0.8, -0.8, 1.2);
+    // FillTestPlanePoses(test_poses_, base_frame, 0.3, 4, 0.8, -0.8, 1.3);
+
+    // // // front right
+    // FillTestPlanePoses(test_poses_, base_frame, 0.3, 4, -0.8, -0.8, 1.1);
+    // FillTestPlanePoses(test_poses_, base_frame, 0.3, 4, -0.8, -0.8, 1.2);
+    // FillTestPlanePoses(test_poses_, base_frame, 0.3, 4, -0.8, -0.8, 1.3);
 
     // // front
     // FillTestPlanePoses(test_poses_, base_frame, 0.3, 3, 0., -0.8, 1.1);
     // FillTestPlanePoses(test_poses_, base_frame, 0.3, 3, 0., -0.8, 1.2);
     // FillTestPlanePoses(test_poses_, base_frame, 0.3, 3, 0., -0.8, 1.3);
-
-    // // front right
-    FillTestPlanePoses(test_poses_, base_frame, 0.3, 4, -0.8, -0.8, 1.1);
-    FillTestPlanePoses(test_poses_, base_frame, 0.3, 4, -0.8, -0.8, 1.2);
-    FillTestPlanePoses(test_poses_, base_frame, 0.3, 4, -0.8, -0.8, 1.3);
 
     // // right
     // FillTestPlanePoses(test_poses_, base_frame, 0.3, 3, -0.8, 0., 1.1);
@@ -195,9 +195,9 @@ bool CalibratingNode::Init() {
     // FillTestPlanePoses(test_poses_, base_frame, 0.3, 3, 0.8, 0., 1.2);
     // FillTestPlanePoses(test_poses_, base_frame, 0.3, 3, 0.8, 0., 1.3);
 
-    // ExecuteTestPoses(test_poses_);
+    // MeasureRobot(5);
+    ExecuteTestPoses(test_poses_);
 
-    MeasureRobot(3);
     return true;
 }
 
@@ -238,7 +238,7 @@ void CalibratingNode::FillTestPlanePoses(std::vector<geometry_msgs::PoseStamped>
     const double L_2 = L/2;
 
     const std::size_t poses_sz = poses_.size();
-    poses_.resize(poses_sz + n*n + n + 1);
+    poses_.resize(poses_sz + n*n + 2*n + 1);
 
     geometry_msgs::PoseStamped pose_;
     pose_.header.stamp = ros::Time::now();
@@ -250,22 +250,22 @@ void CalibratingNode::FillTestPlanePoses(std::vector<geometry_msgs::PoseStamped>
             pose_.pose.position.y = y_offset + h*j - L_2;
             pose_.pose.position.z = z_offset;
 
-            double offset_angle = atan2(pose_.pose.position.y, pose_.pose.position.x);
-
             pose_.pose.orientation.x = 1.;
             pose_.pose.orientation.y = 0.;
             pose_.pose.orientation.z = 0.;
             pose_.pose.orientation.w = 0.;
 
+            double offset_angle = atan2(-pose_.pose.position.y, pose_.pose.position.x);
+
+            // Rotate the pose such that the robot is facing its position
+            tf2::Transform pose_offset_;
+            pose_offset_.setRotation(tf2::Quaternion(0., 0., std::sin(-offset_angle/2),
+                                                             std::cos(-offset_angle/2) ) );
+
             tf2::fromMsg(pose_.pose, tf_pose_);
-            tf2::toMsg(tf_pose_.inverseTimes(tf_X_), pose_.pose);
+            tf2::toMsg((tf_pose_).inverseTimes(pose_offset_*tf_X_), pose_.pose);
 
-            tf2::Quaternion pose_orientation_, pose_offset_;
-            pose_offset_.setRPY(0., 0., -offset_angle);
-            tf2::fromMsg(pose_.pose.orientation, pose_orientation_);
-            tf2::convert(pose_offset_ * pose_orientation_, pose_.pose.orientation);
-
-            poses_[poses_sz + i*n + j] = pose_;
+            poses_[poses_sz + i*(n + 1) + j] = pose_;
         }
     }
 }
@@ -304,12 +304,9 @@ void CalibratingNode::ExecuteTestPoses(std::vector<geometry_msgs::PoseStamped> &
         if (tf_buffer_.canTransform(test_frame, controller_frame, ros::Time(0), &pError) &&
             tf_buffer_.canTransform(test_frame, base_frame, ros::Time(0), &pError) )
         {
-            tf_msg_diff_ = tf_buffer_.lookupTransform(controller_frame, test_frame, ros::Time(0) );
+            tf_msg_diff_ = tf_buffer_.lookupTransform(test_frame, ros::Time(0), controller_frame, ros::Time(0), test_frame);
             SampleSensor(controller_frame, test_frame, 120, 30, tf_msg_diff_);
-            tf_msg_sensor_ = tf_buffer_.lookupTransform(test_frame, ros::Time(0), base_frame, ros::Time(0), base_frame);
-
-            ROS_INFO_STREAM(tf_msg_sensor_);
-            ROS_INFO_STREAM(tf_msg_diff_);
+            tf_msg_sensor_ = tf_buffer_.lookupTransform(base_frame, ros::Time(0), test_frame, ros::Time(0), base_frame);
 
             bag_.write("FK_sensor", ros::Time::now(), tf_msg_sensor_);
             bag_.write("FK_diff", ros::Time::now(), tf_msg_diff_);
