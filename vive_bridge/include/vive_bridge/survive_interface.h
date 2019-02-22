@@ -5,6 +5,7 @@
 
 #include <survive.h>
 #include <survive_api.h>
+#include "vive_bridge/survive_types.h"
 
 // Boost
 #include <boost/algorithm/string/predicate.hpp>
@@ -15,7 +16,6 @@
 #include <algorithm>
 #include <iostream>
 #include <iterator>
-#include <map>
 #include <string>
 #include <vector>
 #include <queue>
@@ -39,7 +39,7 @@ class ViveInterface {
 
     std::array<int, 8> device_classes_;
     std::array<std::string, 8> device_names_;
-    std::array<std::string, 8> device_serials_;
+    // std::array<std::string, 8> device_serials_;
 
     // Callback functions for ROS logging
     DebugMsgCallback VR_DEBUG;

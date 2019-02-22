@@ -1,4 +1,5 @@
 #include "os_generic.h"
+#include <survive_types.h>
 
 // Simple API structures
 struct SurviveExternalObject {
@@ -21,7 +22,7 @@ struct SurviveSimpleObject {
 	} data;
 
 	char name[32];
-	char serial_number[13];
+	char serial_number[16];
 	bool has_update;
 };
 

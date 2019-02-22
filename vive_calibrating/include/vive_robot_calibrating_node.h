@@ -129,7 +129,7 @@ class CalibratingNode {
 
     // Test poses
     void FillTestPlanePoses(std::vector<geometry_msgs::PoseStamped> &poses_, std::string frame_id, 
-                            double L, int n, double x_offset, double y_offset, double z_offset);
+                            double L, double W, int n, int m, double x_offset, double y_offset, double z_offset);
     void ExecuteTestPoses(std::vector<geometry_msgs::PoseStamped> &poses_);
     
     public:

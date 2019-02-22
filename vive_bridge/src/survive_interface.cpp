@@ -1,6 +1,4 @@
 #include "vive_bridge/survive_interface.h"
-#include "vive_bridge/survive_types.h"
-#include "survive_config.h"
 
 
 // Default functions for logging
@@ -45,8 +43,10 @@ static void light_process( SurviveObject * so, int sensor_id, int acode, int tim
 {
     survive_default_light_process(so, sensor_id, acode, timeinsweep, timecode, length, lh);
 
-    printf("Light: [%u][lh %u][%s][acode %u][sensor %u][time in sweep %u][length %u]\n", timecode,
-           lh, so->codename, acode, sensor_id, timeinsweep, length);
+    if (std::string(so->codename) == "T20") {
+        printf("Light: [%u][lh %u][%s][acode %u][sensor %u][time in sweep %u][length %u]\n", timecode,
+            lh, so->codename, acode, sensor_id, timeinsweep, length);
+    }
 }
 
 static void imu_process(SurviveObject * so, int mask, FLT * accelgyromag, uint32_t timecode, int id)
@@ -67,7 +67,7 @@ static void button_process(SurviveObject *so, uint8_t eventType, uint8_t buttonI
     void *ptr = so;
 
     // Check if pointer to the SurviveObject is corrupt
-    if (ptr != nullptr) {
+    //if (ptr != nullptr) {
         struct SurviveSimpleContext *actx = (struct SurviveSimpleContext *) so->ctx->user_ptr;
         intptr_t i = (intptr_t) so->user_ptr;
 
@@ -96,7 +96,7 @@ static void button_process(SurviveObject *so, uint8_t eventType, uint8_t buttonI
         }
 
         OGUnlockMutex(actx->poll_mutex);
-    }
+    //}
 }
 
 ViveInterface::ViveInterface()
@@ -122,6 +122,7 @@ bool ViveInterface::Init(int argc, char **argv) {
     // Install callback functions
     survive_install_button_fn(actx_->ctx, button_process);
     survive_install_imu_fn(actx_->ctx, imu_process);
+
     // survive_install_light_fn(actx_->ctx, light_process);
 
     // survive_install_error_fn(actx_->ctx, error_fn);
@@ -146,8 +147,8 @@ bool ViveInterface::Init(int argc, char **argv) {
 
             // Populate device info
             device_names_[i] = survive_simple_object_name(it_);
-            device_serials_[i] = survive_simple_serial_number(it_);
             device_classes_[i] = SurviveClassToOpenVR(device_names_[i]);
+            // device_serials_[i] = survive_simple_serial_number(it_);
         }
     } else {
         VR_FATAL("libsurvive initialization failed");
@@ -277,11 +278,13 @@ void ViveInterface::GetDeviceSN(const int &device_index, std::string &device_sn)
      * and the device name is therefore returned as a UID instead
      */
 
-    if (!(device_classes_[device_index] == 4) ) {
-        device_sn = device_serials_[device_index];
-    } else {
-        device_sn = device_names_[device_index][2];
-    }
+    // if (!(device_classes_[device_index] == 4) ) {
+    //     device_sn = device_serials_[device_index];
+    // } else {
+    //     device_sn = device_names_[device_index][2];
+    // }
+
+    device_sn = device_names_[device_index][2];
 }
 
 void ViveInterface::GetDevicePose(const int &device_index, float m[3][4]) {
@@ -317,7 +320,7 @@ int ViveInterface::GetDeviceClass(const int &device_index) {
      * Get the class of a tracked device
      */
 
-    return SurviveClassToOpenVR(device_names_[device_index] );
+    return device_classes_[device_index];
 }
 
 bool ViveInterface::PoseIsValid(const int &device_index) {

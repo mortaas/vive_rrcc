@@ -1,13 +1,49 @@
 <?xml version="1.0"?>
 
 <launch>
-    <rosparam param="/vive_calibrating_node/controller_frame">"controller_LHR_FDBBBBC0"</rosparam>
-    <rosparam param="/vive_calibrating_node/base_frame">"floor_base"</rosparam>
-    <rosparam param="/vive_calibrating_node/tool_frame">"floor_tool0"</rosparam>
-    <rosparam param="/vive_calibrating_node/test_frame">"controller_test"</rosparam>
-    <rosparam param="/vive_calibrating_node/joints_folded">"[1.5707893454778887, -2.5900040327772613, 2.3999184786133068, -2.6179938779914945e-05, 0.799936756066561, 8.377580409572782e-05]"</rosparam>
-    <rosparam param="/vive_calibrating_node/joints_home">"[1.5707718921853686, -1.5708155254166685, 1.5708399600261964, 0.0, 2.6179938779914945e-05, 0.0]"</rosparam>
+    <arg name="M_PI"   value="3.14159265358979323846"/>
+    <arg name="M_PI_2" value="1.57079632679489661923"/>
+    <arg name="M_PI_4" value="0.78539816339744830962"/>
 
+    <arg name="controller" default="controller_LHR_FDBBBBC0"/>
+
+    <!-- Launch the calibration node -->
     <node name="parkmartin_node" pkg="vive_calibrating" type="parkmartin_node" output="screen" required="true"/>
-    <node name="vive_robot_calibrating_node" pkg="vive_calibrating" type="vive_robot_calibrating_node" output="screen" required="true"/>
+
+    <!-- Launch the sampling node -->
+    <node name="vive_robot_calibrating_node" pkg="vive_calibrating" type="vive_robot_calibrating_node" output="screen" required="true">
+        <param name="controller_frame" value="$(arg controller)"/>
+
+        <!-- Sphere sampling parameters for calibration -->
+        <param name="radius_lower_bound"            value="1.4"/>
+        <param name="radius_upper_bound"            value="1.6"/>
+
+        <param name="theta_position_lower_bound"    value="$(eval 5.75 * arg('M_PI_4') )"/>
+        <param name="theta_position_upper_bound"    value="$(eval 6.25 * arg('M_PI_4') )"/>
+        <param name="phi_position_lower_bound"      value="$(eval 0.5  * arg('M_PI_4') )"/>
+        <param name="phi_position_upper_bound"      value="$(eval 0.75 * arg('M_PI_4') )"/>
+
+        <param name="theta_orientation_lower_bound" value="$(eval 5.   * arg('M_PI_4') )"/>
+        <param name="theta_orientation_upper_bound" value="$(eval 6.   * arg('M_PI_4') )"/>
+        <param name="phi_orientation_lower_bound"   value="$(eval 1.25 * arg('M_PI_4') )"/>
+        <param name="phi_orientation_upper_bound"   value="$(eval 2.75 * arg('M_PI_4') )"/>
+
+        <!-- Parameters for sampling of rectangular tracking volume -->
+        <param name="length" value="2."/>
+        <param name="width"  value="1."/>
+        <param name="length_segments" value="6"/>
+        <param name="width_segments"  value="3"/>
+        <param name="x_center" value="-1."/>
+        <param name="y_center" value="-1."/>
+        <param name="z_center" value=" 1."/>
+
+        <!-- Robot and sensor test frames -->
+        <rosparam param="base_frame">"floor_base"</rosparam>
+        <rosparam param="tool_frame">"floor_tool0"</rosparam>
+        <rosparam param="test_frame">"controller_test"</rosparam>
+
+        <!-- Robot joint states -->
+        <rosparam param="joints_folded">"[1.5707893454778887, -2.5900040327772613, 2.3999184786133068, -2.6179938779914945e-05, 0.799936756066561, 8.377580409572782e-05]"</rosparam>
+        <rosparam param="joints_home">"[1.5707718921853686, -1.5708155254166685, 1.5708399600261964, 0.0, 2.6179938779914945e-05, 0.0]"</rosparam>
+    </node>
 </launch>

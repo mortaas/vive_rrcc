@@ -3,19 +3,19 @@
 <launch>
     <arg name="cmd" default="" />
 
-    <!-- VIVE meshes -->
-    <rosparam param="/vive_node/hmd_mesh_path">"package://vive_bridge/meshes/vive_pro_headset/vive_pro_headset.dae"</rosparam>
-    <rosparam param="/vive_node/controller_mesh_path">"package://vive_bridge/meshes/vr_controller_vive_1_5/vr_controller_vive_1_5.dae"</rosparam>
-    <rosparam param="/vive_node/tracker_mesh_path">"package://vive_bridge/meshes/TRACKER-3D.dae"</rosparam>
-    <rosparam param="/vive_node/lighthouse_mesh_path">"package://vive_bridge/meshes/lh_basestation_vive/lh_basestation_vive.dae"</rosparam>
-
-    <!-- Offset transformation parameters -->
-    <rosparam param="/vive_node/world_frame">"root"</rosparam>
-    <rosparam param="/vive_node/vr_frame">"world_vr"</rosparam>
-
     <!-- Load dynamic reconfigure parameters -->
-    <node name="vive_dynparam" pkg="dynamic_reconfigure" type="dynparam" args="load vive_node $(find vive_bridge)/cfg/dynparam.yaml"/>
+    <!-- <node name="vive_dynparam" pkg="dynamic_reconfigure" type="dynparam" args="load vive_node $(find vive_bridge)/cfg/dynparam.yaml"/> -->
 
     <!-- Launch node through steam with shell script -->
-    <node name="vive_node" pkg="vive_bridge" type="survive_bridge_node" output="screen" required="true" args ="$(arg cmd)"/>
+    <node name="vive_node" pkg="vive_bridge" type="survive_bridge_node" output="screen" required="true" args="$(arg cmd)">
+        <!-- VIVE meshes -->
+        <rosparam param="/hmd_mesh_path">"package://vive_bridge/meshes/vive_pro_headset/vive_pro_headset.dae"</rosparam>
+        <rosparam param="/controller_mesh_path">"package://vive_bridge/meshes/vr_controller_vive_1_5/vr_controller_vive_1_5.dae"</rosparam>
+        <rosparam param="/tracker_mesh_path">"package://vive_bridge/meshes/TRACKER-3D.dae"</rosparam>
+        <rosparam param="/lighthouse_mesh_path">"package://vive_bridge/meshes/lh_basestation_vive/lh_basestation_vive.dae"</rosparam>
+
+        <!-- Offset transformation parameters -->
+        <rosparam param="/world_frame">"root"</rosparam>
+        <rosparam param="/vr_frame">"world_vr"</rosparam>
+    </node>
 </launch>

@@ -4,10 +4,12 @@
 #include <openvr.h>
 #include <boost/function.hpp>
 
+// STL
 #include <iostream>
-#include <map>
 #include <string>
 #include <vector>
+#include <map>
+
 
 // ROS logging
 typedef boost::function<void(const std::string&)> DebugMsgCallback;
@@ -15,6 +17,7 @@ typedef boost::function<void(const std::string&)> InfoMsgCallback;
 typedef boost::function<void(const std::string&)> WarnMsgCallback;
 typedef boost::function<void(const std::string&)> ErrorMsgCallback;
 typedef boost::function<void(const std::string&)> FatalMsgCallback;
+
 
 class ViveInterface {
     // OpenVR
