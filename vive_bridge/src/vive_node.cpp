@@ -9,7 +9,7 @@ void IntHandler(int signal) {
 
 
 ViveNode::ViveNode(int frequency)
-    : nh_(ros::NodeHandle("vive_node") ),
+    : pvt_nh_("~"),
       loop_rate_(frequency),
       tf_broadcaster_(),
       static_tf_broadcaster_(),
@@ -23,10 +23,10 @@ ViveNode::ViveNode(int frequency)
     vr_.SetFatalMsgCallback(HandleFatalMsgs);
 
     // Publisher and service for info about tracked devices
-    devices_pub_ = nh_.advertise<vive_bridge::TrackedDevicesStamped>("tracked_devices", 10, true);
-    devices_service_ = nh_.advertiseService("tracked_devices", &ViveNode::ReturnTrackedDevices, this);
+    devices_pub_ = pvt_nh_.advertise<vive_bridge::TrackedDevicesStamped>("tracked_devices", 10, true);
+    devices_service_ = pvt_nh_.advertiseService("tracked_devices", &ViveNode::ReturnTrackedDevices, this);
 
-    joy_feedback_sub_ = nh_.subscribe("haptic_feedback", 10, &ViveNode::HapticFeedbackCallback, this);
+    joy_feedback_sub_ = pvt_nh_.subscribe("joy/haptic_feedback", 10, &ViveNode::HapticFeedbackCallback, this);
 }
 
 int ViveNode::FindEmulatedNumpadState(float x, float y) {
@@ -156,17 +156,17 @@ bool ViveNode::InitParams() {
       * Returns true if the parameters was retrieved from the server, false otherwise.
       */
     
-    return (nh_.param<std::string>("/vive_node/hmd_mesh_path",           hmd_mesh_path,
+    return (pvt_nh_.param<std::string>("hmd_mesh_path",           hmd_mesh_path,
                                    "package://vive_bridge/meshes/vr_hmd_vive_2_0/vr_hmd_vive_2_0.dae")               &&
-            nh_.param<std::string>("/vive_node/controller_mesh_path",    controller_mesh_path,
+            pvt_nh_.param<std::string>("controller_mesh_path",    controller_mesh_path,
                                    "package://vive_bridge/meshes/vr_controller_vive_1_5/vr_controller_vive_1_5.dae") &&
-            nh_.param<std::string>("/vive_node/tracker_mesh_path",       tracker_mesh_path,
+            pvt_nh_.param<std::string>("tracker_mesh_path",       tracker_mesh_path,
                                    "package://vive_bridge/meshes/TRACKER-3D.dae")                                    &&
-            nh_.param<std::string>("/vive_node/lighthouse_mesh_path",    lighthouse_mesh_path,
+            pvt_nh_.param<std::string>("lighthouse_mesh_path",    lighthouse_mesh_path,
                                    "package://vive_bridge/meshes/lh_basestation_vive/lh_basestation_vive.dae")       &&
             
-            nh_.param<std::string>("/vive_node/world_frame", world_frame,       "root")     &&
-            nh_.param<std::string>("/vive_node/vr_frame",    vr_frame,          "world_vr") );
+            pvt_nh_.param<std::string>("world_frame", world_frame,       "root")     &&
+            pvt_nh_.param<std::string>("vr_frame",    vr_frame,          "world_vr") );
 }
 
 void ViveNode::ReconfCallback(vive_bridge::ViveConfig &config, uint32_t level) {
@@ -446,17 +446,17 @@ void ViveNode::Loop() {
                         switch(devices_msg_.device_classes[i]) {
                             case vr::TrackedDeviceClass_HMD:
                                 twist_pubs_map_[TrackedDevices[i].serial_number] =
-                                    nh_.advertise<geometry_msgs::TwistStamped>("twist/hmd_" +
+                                    pvt_nh_.advertise<geometry_msgs::TwistStamped>("twist/hmd_" +
                                                                                TrackedDevices[i].serial_number, 10);
                                 break;
                             case vr::TrackedDeviceClass_Controller:
                                 twist_pubs_map_[TrackedDevices[i].serial_number] =
-                                    nh_.advertise<geometry_msgs::TwistStamped>("twist/controller_" +
+                                    pvt_nh_.advertise<geometry_msgs::TwistStamped>("twist/controller_" +
                                                                                TrackedDevices[i].serial_number, 10);
                                 break;
                             case vr::TrackedDeviceClass_GenericTracker:
                                 twist_pubs_map_[TrackedDevices[i].serial_number] =
-                                    nh_.advertise<geometry_msgs::TwistStamped>("twist/tracker_" +
+                                    pvt_nh_.advertise<geometry_msgs::TwistStamped>("twist/tracker_" +
                                                                                TrackedDevices[i].serial_number, 10);
                                 break;
                         }
@@ -480,7 +480,7 @@ void ViveNode::Loop() {
                     // Advertise joy topic if the tracked device is new
                     if (joy_pubs_map_.count(TrackedDevices[i].serial_number) == 0) {
                         joy_pubs_map_[TrackedDevices[i].serial_number] =
-                            nh_.advertise<sensor_msgs::Joy>("joy/controller_" +
+                            pvt_nh_.advertise<sensor_msgs::Joy>("joy/controller_" +
                                                             TrackedDevices[i].serial_number, 10);
                         break;
                     }

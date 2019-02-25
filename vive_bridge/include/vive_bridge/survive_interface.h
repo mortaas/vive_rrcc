@@ -39,7 +39,7 @@ class ViveInterface {
 
     std::array<int, 8> device_classes_;
     std::array<std::string, 8> device_names_;
-    // std::array<std::string, 8> device_serials_;
+    std::array<std::string, 8> device_serials_;
 
     // Callback functions for ROS logging
     DebugMsgCallback VR_DEBUG;

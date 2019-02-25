@@ -148,7 +148,7 @@ bool ViveInterface::Init(int argc, char **argv) {
             // Populate device info
             device_names_[i] = survive_simple_object_name(it_);
             device_classes_[i] = SurviveClassToOpenVR(device_names_[i]);
-            // device_serials_[i] = survive_simple_serial_number(it_);
+            device_serials_[i] = survive_simple_serial_number(it_);
         }
     } else {
         VR_FATAL("libsurvive initialization failed");
@@ -273,18 +273,10 @@ int ViveInterface::SurviveClassToOpenVR(const std::string &device_name) {
 
 void ViveInterface::GetDeviceSN(const int &device_index, std::string &device_sn) {
     /**
-     * Should ideally get the serial number of a tracked device.
-     * The serial number is not easily available in libsurvive,
-     * and the device name is therefore returned as a UID instead
+     * Get the serial number of a tracked device.
      */
 
-    // if (!(device_classes_[device_index] == 4) ) {
-    //     device_sn = device_serials_[device_index];
-    // } else {
-    //     device_sn = device_names_[device_index][2];
-    // }
-
-    device_sn = device_names_[device_index][2];
+    device_sn = device_serials_[device_index];
 }
 
 void ViveInterface::GetDevicePose(const int &device_index, float m[3][4]) {

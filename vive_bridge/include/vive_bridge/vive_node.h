@@ -49,7 +49,7 @@ struct TrackedDevice {
 };
 
 class ViveNode {
-    ros::NodeHandle nh_;
+    ros::NodeHandle nh_, pvt_nh_;
     ros::Rate loop_rate_;
 
     std::string PACKAGE_PATH, NODE_NAME;

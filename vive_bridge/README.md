@@ -17,8 +17,6 @@ The package exposes the position and orientation (pose) of each device as coordi
 
 The package can also publishes the linear and angular velocities (twists) of tracked devices as a geometry_msgs/TwistStamped message on the */vive_node/twist/&lt;device type&gt;_&lt;serial number&gt;* topic, e.g. */vive_node/twist/controller_LHR_FF6FFD46*. Axes and buttons on controllers can also be published as a sensor_msgs/Joy message on the */vive_node/joy/&lt;device type&gt;_&lt;serial number&gt;* topic, e.g. */vive_node/joy/controller_LHR_FF6FFD46*. Joy messages are only published when the controllers are interacted with. These publishers are not enabled by default, but they are easily enabled during runtime by using the [rqt_reconfigure](http://wiki.ros.org/rqt_reconfigure) package.
 
-The [libsurvive](https://github.com/cnlohr/libsurvive) portion of this package currently uses an internal codename instead, with structure: &lt;device type&gt;\_&lt;codename&gt;, e.g. coordinate frame *controller_WM0*, twist topic */vive_node/twist/controller_WM0* and joy topic */vive_node/joy/controller_WM0*.
-
 ### Visualization
 
 It is also possible to visualize the tracked devices by using a MarkerArray display in RViz. The mesh files are defined in the ```launch/vive_node.launch``` file as parameters for each type of device:

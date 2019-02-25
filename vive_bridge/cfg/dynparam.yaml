@@ -15,12 +15,12 @@ dictitems:
               parent: 0
               state: true
               type: ''
-              vr_pitch_offset: 0.6233353779349989
-              vr_roll_offset: -0.20561288058485155
-              vr_x_offset: -5.0
-              vr_y_offset: -0.97632232557524
-              vr_yaw_offset: -0.46441559973641305
-              vr_z_offset: -5.0
+              vr_pitch_offset: -0.07125462830840709
+              vr_roll_offset: 0.057939954127704946
+              vr_x_offset: -0.8814467203999763
+              vr_y_offset: -0.6396041203277618
+              vr_yaw_offset: 0.4207876670304432
+              vr_z_offset: 0.5542970389706323
             state: []
         state: []
       id: 0
@@ -31,10 +31,10 @@ dictitems:
       state: true
       type: ''
     state: []
-  vr_pitch_offset: 0.6233353779349989
-  vr_roll_offset: -0.20561288058485155
-  vr_x_offset: -5.0
-  vr_y_offset: -0.97632232557524
-  vr_yaw_offset: -0.46441559973641305
-  vr_z_offset: -5.0
+  vr_pitch_offset: -0.07125462830840709
+  vr_roll_offset: 0.057939954127704946
+  vr_x_offset: -0.8814467203999763
+  vr_y_offset: -0.6396041203277618
+  vr_yaw_offset: 0.4207876670304432
+  vr_z_offset: 0.5542970389706323
 state: []

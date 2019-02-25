@@ -6,6 +6,11 @@ struct SurviveExternalObject {
 	SurvivePose pose;
 };
 
+struct SurviveLighthouseData {
+	int lighthouse;
+	char serial_number[16];
+};
+
 struct SurviveSimpleObject {
 	struct SurviveSimpleContext *actx;
 
@@ -16,13 +21,12 @@ struct SurviveSimpleObject {
 	} type;
 
 	union {
-		int lighthouse;
+		struct SurviveLighthouseData lh;
 		struct SurviveObject *so;
 		struct SurviveExternalObject seo;
 	} data;
 
 	char name[32];
-	char serial_number[16];
 	bool has_update;
 };
 

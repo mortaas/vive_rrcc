@@ -55,8 +55,8 @@ bool CalibrationTestNode::InitParams() {
       * Returns true if the parameters were retrieved from the server, false otherwise.
       */
 
-    if (nh_.param<std::string>("/vive_calibrating_node/controller_frame", controller_frame, "") &&
-        nh_.param<std::string>("/vive_calibrating_node/test_frame",       test_frame,       "controller_test") )
+    if (nh_.param<std::string>("/vive_robot_calibrating_node/controller_frame", controller_frame, "") &&
+        nh_.param<std::string>("/vive_robot_calibrating_node/test_frame",       test_frame,       "controller_test") )
     {
         return true;
     } else {

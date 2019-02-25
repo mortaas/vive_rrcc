@@ -9,7 +9,8 @@ void IntHandler(int signal) {
 
 
 CalibratingNode::CalibratingNode(int frequency)
-    : loop_rate_(frequency),
+    : pvt_nh_("~"),
+      loop_rate_(frequency),
       tf_listener_(new tf2_ros::TransformListener(tf_buffer_) ),
       move_group_(moveit::planning_interface::MoveGroupInterface(PLANNING_GROUP) ),
       rng1(random_seed1() ),
@@ -19,8 +20,8 @@ CalibratingNode::CalibratingNode(int frequency)
     traj_pub_ = nh_.advertise<trajectory_msgs::JointTrajectory>("/floor/position_trajectory_controller/command", 2, false);
 
     // Services
-    sample_client =  nh_.serviceClient<vive_calibrating::AddSample>("/vive_calibration/add_sample");
-    compute_client = nh_.serviceClient<vive_calibrating::ComputeCalibration>("/vive_calibration/compute_calibration");
+    sample_client =  nh_.serviceClient<vive_calibrating::AddSample>("/parkmartin/add_sample");
+    compute_client = nh_.serviceClient<vive_calibrating::ComputeCalibration>("/parkmartin/compute_calibration");
 
     // Define dynamic reconfigure message for calibrating frames
     srv_reconf_req_.config.doubles.resize(6);
@@ -74,11 +75,13 @@ bool CalibratingNode::InitParams() {
 
     if (nh_.param<std::string>("/vive_node/vr_frame",                     vr_frame,         "world_vr") &&
         nh_.param<std::string>("/vive_node/world_frame",                  world_frame,      "root") &&
-        nh_.param<std::string>("/vive_calibrating_node/controller_frame", controller_frame, "") &&
-        nh_.param<std::string>("/vive_calibrating_node/base_frame",       base_frame,       "floor_base") &&
-        nh_.param<std::string>("/vive_calibrating_node/tool_frame",       tool_frame,       "floor_tool0") &&
-        nh_.param<std::string>("/vive_calibrating_node/test_frame",       test_frame,       "controller_test") &&
-        nh_.getParam("/vive_calibrating_node/joints_folded", joints_folded) )
+
+        pvt_nh_.param<std::string>("controller_frame", controller_frame, "") &&
+        pvt_nh_.param<std::string>("base_frame",       base_frame,       "floor_base") &&
+        pvt_nh_.param<std::string>("tool_frame",       tool_frame,       "floor_tool0") &&
+        pvt_nh_.param<std::string>("test_frame",       test_frame,       "controller_test") &&
+
+        pvt_nh_.getParam("joints_folded", joints_folded) )
     {
         return true;
     } else {
@@ -154,11 +157,11 @@ bool CalibratingNode::Init() {
     ROS_INFO_STREAM(tf_msg_X_inv_);
 
     std::vector<geometry_msgs::PoseStamped> test_poses_;
-    FillTestPlanePoses(test_poses_, base_frame, 2., 1., 6, 3, -0.5, -1.0, 0.8);
-    FillTestPlanePoses(test_poses_, base_frame, 2., 1., 6, 3, -0.5, -1.0, 1. );
-    FillTestPlanePoses(test_poses_, base_frame, 2., 1., 6, 3, -0.5, -1.0, 1.2);
+    // FillTestPlanePoses(test_poses_, base_frame, 2., 1., 6, 3, -0.5, -1.0, 1.);
+    FillTestPlanePoses(test_poses_, base_frame, 0.5, 0.5, 3, 3, -0.5, -0.75, 1.2);
+    FillTestPlanePoses(test_poses_, base_frame, 0.5, 0.5, 3, 3, -0.5, -0.75, 1.4);
 
-    // MeasureRobot(120);
+    // MeasureRobot(60);
     ExecuteTestPoses(test_poses_);
 
     return true;

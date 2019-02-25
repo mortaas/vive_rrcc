@@ -3,16 +3,17 @@
 
 
 ParkMartinNode::ParkMartinNode(int frequency)
-    : loop_rate_(frequency)
+    : pvt_nh_("~"),
+      loop_rate_(frequency)
 {   
     // Number of sampled pairs (A, B)
     n_samples = 0;
 
     // Advertise services
-    sample_service_  = nh_.advertiseService("/vive_calibration/add_sample",
-                                            &ParkMartinNode::AddSample, this);
-    compute_service_ = nh_.advertiseService("/vive_calibration/compute_calibration",
-                                            &ParkMartinNode::ComputeCalibration, this);
+    sample_service_  = pvt_nh_.advertiseService("add_sample",
+                                                &ParkMartinNode::AddSample, this);
+    compute_service_ = pvt_nh_.advertiseService("compute_calibration",
+                                                &ParkMartinNode::ComputeCalibration, this);
 }
 ParkMartinNode::~ParkMartinNode() {
 }

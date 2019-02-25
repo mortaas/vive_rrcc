@@ -56,7 +56,7 @@
 
 class CalibratingNode {
     // ROS
-    ros::NodeHandle nh_;
+    ros::NodeHandle nh_, pvt_nh_;
     ros::Rate loop_rate_;
 
     rosbag::Bag bag_;
