@@ -5,7 +5,8 @@
     <arg name="M_PI_2" value="1.57079632679489661923"/>
     <arg name="M_PI_4" value="0.78539816339744830962"/>
 
-    <arg name="controller" default="controller_LHR_FDBBBBC0"/>
+    <arg name="controller" default="controller_LHR_FDB9BFC4"/>
+    <arg name="group"      default="floor_manipulator"/>
 
     <!-- Launch the calibration node -->
     <node name="parkmartin_node" pkg="vive_calibrating" type="parkmartin_node" output="screen" required="true"/>
@@ -13,6 +14,7 @@
     <!-- Launch the sampling node -->
     <node name="vive_robot_calibrating_node" pkg="vive_calibrating" type="vive_robot_calibrating_node" output="screen" required="true">
         <param name="controller_frame" value="$(arg controller)"/>
+        <param name="planning_group" value="$(arg group)"/>
 
         <!-- Sphere sampling parameters for calibration -->
         <param name="radius_lower_bound"            value="1.4"/>

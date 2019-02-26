@@ -155,6 +155,7 @@ include_directories(
 # add_library(${PROJECT_NAME}
 #   src/${PROJECT_NAME}/vive_calibrating.cpp
 # )
+add_library(robot_interface src/robot_interface.cpp)
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
@@ -166,7 +167,8 @@ include_directories(
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(simple_calibrating_node src/simple_calibrating_node.cpp)
 add_executable(manual_calibrating_node src/manual_calibrating_node.cpp)
-add_executable(vive_robot_calibrating_node src/vive_robot_calibrating_node.cpp)
+add_executable(vive_robot_calibrating_node src/vive_robot_calibrating_node.cpp
+                                           src/robot_interface.cpp)
 add_executable(parkmartin_node src/parkmartin_node.cpp)
 add_executable(simple_calibration_test src/simple_calibration_test.cpp)
 # add_executable(ceres_test src/test_ceres_se3.cpp)
@@ -190,15 +192,12 @@ target_link_libraries(manual_calibrating_node
 )
 target_link_libraries(vive_robot_calibrating_node
   ${catkin_LIBRARIES}
+  robot_interface
 )
 target_link_libraries(parkmartin_node
   ${catkin_LIBRARIES}
   ${CERES_LIBRARIES}
 )
-# target_link_libraries(ceres_test
-#   ${catkin_LIBRARIES}
-#   ${CERES_LIBRARIES}
-# )
 target_link_libraries(simple_calibration_test
   ${catkin_LIBRARIES}
 )

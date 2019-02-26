@@ -5,7 +5,6 @@
 
 #include <survive.h>
 #include <survive_api.h>
-#include "vive_bridge/survive_types.h"
 
 // Boost
 #include <boost/algorithm/string/predicate.hpp>

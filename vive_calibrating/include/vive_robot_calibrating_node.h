@@ -36,13 +36,15 @@
 #include <average.h>
 
 // MoveIt!
-#include <moveit/move_group_interface/move_group_interface.h>
+// #include <moveit/move_group_interface/move_group_interface.h>
 
-#include <moveit/robot_model_loader/robot_model_loader.h>
-#include <moveit/robot_model/robot_model.h>
-#include <moveit/robot_state/robot_state.h>
+// #include <moveit/robot_model_loader/robot_model_loader.h>
+// #include <moveit/robot_model/robot_model.h>
+// #include <moveit/robot_state/robot_state.h>
 
-#include "moveit_msgs/Constraints.h"
+// #include "moveit_msgs/Constraints.h"
+
+#include "robot_interface.h"
 
 // Boost
 #include <boost/algorithm/string/predicate.hpp>
@@ -62,17 +64,16 @@ class CalibratingNode {
     rosbag::Bag bag_;
 
     // Subscribers
-    ros::Subscriber joy_sub_;
     ros::Subscriber device_sub_;
     // Callback functions
     void DevicesCb(const vive_bridge::TrackedDevicesStamped& msg_);
 
-    // Publisher
-    ros::Publisher traj_pub_;
     // Service
     ros::ServiceClient sample_client, compute_client;
-    // Action client
-    actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction> *action_client_;
+    // Service msgs
+    vive_calibrating::AddSample sample_srv;
+    vive_calibrating::ComputeCalibration compute_srv;
+
     // msgs
     geometry_msgs::TransformStamped tf_msg_, tf_msg_pose_;
 
@@ -83,7 +84,11 @@ class CalibratingNode {
 
     // Parameters
     double yaw_offset, pitch_offset, roll_offset;
-    std::string controller_frame, vr_frame, world_frame, base_frame, tool_frame, test_frame;
+    std::string vr_frame,   controller_frame, test_frame,
+                base_frame, tool_frame,       world_frame;
+
+    std::vector<double> joints_home;
+    std::string planning_group;
 
     bool InitParams();
 
@@ -91,14 +96,10 @@ class CalibratingNode {
     dynamic_reconfigure::ReconfigureRequest srv_reconf_req_;
     dynamic_reconfigure::ReconfigureResponse srv_reconf_resp_;
 
-    // MoveIt!
-    moveit::planning_interface::MoveGroupInterface move_group_;
-    static const std::string PLANNING_GROUP;
+    RobotInterface* robot_;
 
-    bool MoveRobot(const geometry_msgs::PoseStamped &pose_);
-    std::vector<double> joints_folded;
-
-    bool CalibrateViveNode();
+    // // MoveIt!
+    std::vector<moveit::planning_interface::MoveGroupInterface::Plan> calibration_plans_, verification_plans_;
 
     // tf2
     tf2_ros::Buffer tf_buffer_;
@@ -110,10 +111,11 @@ class CalibratingNode {
     
     tf2::Transform tf_pose_, tf_controller_;
 
+    bool CalibrateViveNode();
     void MeasureRobot(const int &N);
+
     void SampleSensor(const std::string &target_frame, const std::string &source_frame,
                       const int &N, const int &F, geometry_msgs::TransformStamped &tf_msg_avg_);
-
     std::vector<Eigen::Vector3d> eigen_translations_;
     std::vector<Eigen::Quaterniond> eigen_rotations_;
 
@@ -128,9 +130,9 @@ class CalibratingNode {
     geometry_msgs::Pose GenerateRandomPose(geometry_msgs::Pose &pose_);
 
     // Test poses
-    void FillTestPlanePoses(std::vector<geometry_msgs::PoseStamped> &poses_, std::string frame_id, 
+    void FillTestPlanePlans(std::vector<moveit::planning_interface::MoveGroupInterface::Plan> &plans_, std::string frame_id, 
                             double L, double W, int n, int m, double x_offset, double y_offset, double z_offset);
-    void ExecuteTestPoses(std::vector<geometry_msgs::PoseStamped> &poses_);
+    void ExecuteTestPlans(std::vector<moveit::planning_interface::MoveGroupInterface::Plan> &plans_);
     
     public:
         CalibratingNode(int frequency);
@@ -140,4 +142,3 @@ class CalibratingNode {
         void Loop();
         void Shutdown();
 };
-const std::string CalibratingNode::PLANNING_GROUP = "floor_manipulator";

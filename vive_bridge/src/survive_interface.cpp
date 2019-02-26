@@ -66,37 +66,34 @@ static void button_process(SurviveObject *so, uint8_t eventType, uint8_t buttonI
 
     void *ptr = so;
 
-    // Check if pointer to the SurviveObject is corrupt
-    //if (ptr != nullptr) {
-        struct SurviveSimpleContext *actx = (struct SurviveSimpleContext *) so->ctx->user_ptr;
-        intptr_t i = (intptr_t) so->user_ptr;
+    struct SurviveSimpleContext *actx = (struct SurviveSimpleContext *) so->ctx->user_ptr;
+    intptr_t i = (intptr_t) so->user_ptr;
 
-        OGLockMutex(actx->poll_mutex);
+    OGLockMutex(actx->poll_mutex);
 
-        switch(eventType) {
-            case BUTTON_EVENT_BUTTON_DOWN :
+    switch(eventType) {
+        case BUTTON_EVENT_BUTTON_DOWN :
+            controller_device_index.push(i);
+            controller_event_type.push(200); // ButtonPress
+            break;
+        case BUTTON_EVENT_BUTTON_UP :
+            controller_device_index.push(i);
+            controller_event_type.push(201); // ButtonUnpress
+            break;
+        case BUTTON_EVENT_AXIS_CHANGED :
+            if (axis1Val + axis2Val != 0.) {
                 controller_device_index.push(i);
-                controller_event_type.push(200); // ButtonPress
-                break;
-            case BUTTON_EVENT_BUTTON_UP :
+                controller_event_type.push(202); // ButtonTouch
+            } else {
                 controller_device_index.push(i);
-                controller_event_type.push(201); // ButtonUnpress
-                break;
-            case BUTTON_EVENT_AXIS_CHANGED :
-                if (axis1Val + axis2Val != 0.) {
-                    controller_device_index.push(i);
-                    controller_event_type.push(202); // ButtonTouch
-                } else {
-                    controller_device_index.push(i);
-                    controller_event_type.push(203); // ButtonUntouch
-                }
-                break;
-            case BUTTON_EVENT_BUTTON_NONE :
-                break;
-        }
+                controller_event_type.push(203); // ButtonUntouch
+            }
+            break;
+        case BUTTON_EVENT_BUTTON_NONE :
+            break;
+    }
 
-        OGUnlockMutex(actx->poll_mutex);
-    //}
+    OGUnlockMutex(actx->poll_mutex);
 }
 
 ViveInterface::ViveInterface()
