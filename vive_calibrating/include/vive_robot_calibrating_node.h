@@ -83,6 +83,8 @@ class CalibratingNode {
     geometry_msgs::PoseStamped pose_msg_;
 
     // Parameters
+    bool calibrate_flag, test_flag;
+    int calibration_samples;
     double yaw_offset, pitch_offset, roll_offset;
     std::string vr_frame,   controller_frame, test_frame,
                 base_frame, tool_frame,       world_frame;
@@ -99,7 +101,7 @@ class CalibratingNode {
     RobotInterface* robot_;
 
     // // MoveIt!
-    std::vector<moveit::planning_interface::MoveGroupInterface::Plan> calibration_plans_, verification_plans_;
+    std::vector<moveit::planning_interface::MoveGroupInterface::Plan> calibration_plans_, test_plans_;
 
     // tf2
     tf2_ros::Buffer tf_buffer_;
@@ -131,7 +133,7 @@ class CalibratingNode {
 
     // Test poses
     void FillTestPlanePlans(std::vector<moveit::planning_interface::MoveGroupInterface::Plan> &plans_, std::string frame_id, 
-                            double L, double W, int n, int m, double x_offset, double y_offset, double z_offset);
+                            double L, double W, int n, int m, double x_offset, double y_offset, double z_offset, bool reverse_order);
     void ExecuteTestPlans(std::vector<moveit::planning_interface::MoveGroupInterface::Plan> &plans_);
     
     public:

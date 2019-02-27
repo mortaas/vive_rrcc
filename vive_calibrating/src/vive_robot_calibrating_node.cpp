@@ -68,14 +68,19 @@ bool CalibratingNode::InitParams() {
     joints_home = {1.5707893454778887,    -2.5900040327772613, 2.3999184786133068,
                     -2.6179938779914945e-05, 0.799936756066561,  8.377580409572782e-05};
 
-    if (nh_.param<std::string>("/vive_node/vr_frame",                     vr_frame,         "world_vr") &&
-        nh_.param<std::string>("/vive_node/world_frame",                  world_frame,      "root") &&
+    if (nh_.param<std::string>("/vive_node/vr_frame",    vr_frame,              "world_vr") &&
+        nh_.param<std::string>("/vive_node/world_frame", world_frame,           "root") &&
 
-        pvt_nh_.param<std::string>("planning_group",   planning_group,   "floor_manipulator") &&
-        pvt_nh_.param<std::string>("controller_frame", controller_frame, "") &&
-        pvt_nh_.param<std::string>("base_frame",       base_frame,       "floor_base") &&
-        pvt_nh_.param<std::string>("tool_frame",       tool_frame,       "floor_tool0") &&
-        pvt_nh_.param<std::string>("test_frame",       test_frame,       "controller_test") &&
+        pvt_nh_.param<std::string>("planning_group",     planning_group,        "floor_manipulator") &&
+        pvt_nh_.param<std::string>("controller_frame",   controller_frame,      "") &&
+        pvt_nh_.param<std::string>("base_frame",         base_frame,            "floor_base") &&
+        pvt_nh_.param<std::string>("tool_frame",         tool_frame,            "floor_tool0") &&
+        pvt_nh_.param<std::string>("test_frame",         test_frame,            "controller_test") &&
+
+        pvt_nh_.param("calibration_samples",             calibration_samples,   10) &&
+
+        pvt_nh_.param("calibrate_flag",                  calibrate_flag,        true)  &&
+        pvt_nh_.param("test_flag",                       test_flag,             false) &&
 
         pvt_nh_.getParam("joints_folded", joints_home) )
     {
@@ -111,6 +116,7 @@ bool CalibratingNode::Init() {
     }
     ROS_INFO_STREAM("Using " + controller_frame + " for calibration");
 
+    // Check if required coordinate frames are available from the tf server
     std::string pError;
     if (!tf_buffer_.canTransform(vr_frame, controller_frame, ros::Time(0),
                                  ros::Duration(5.), &pError) )
@@ -119,19 +125,6 @@ bool CalibratingNode::Init() {
 
         return false;
     }
-
-    // Parameter distributions for random poses
-    r_dist = std::uniform_real_distribution<double>(1.4, 1.6);
-    theta_dist1 = std::uniform_real_distribution<double>(5.75 * M_PI_4, 6.25 * M_PI_4);
-    phi_dist1 =   std::uniform_real_distribution<double>(0.5  * M_PI_4, 0.75 * M_PI_4);
-    theta_dist2 = std::uniform_real_distribution<double>(5.   * M_PI_4, 7.   * M_PI_4);
-    phi_dist2 =   std::uniform_real_distribution<double>(1.25 * M_PI_4, 2.75 * M_PI_4);
-
-    // Initialize headers
-    tf_msg_pose_.header.frame_id = base_frame;
-    tf_msg_pose_.child_frame_id = "tool0_desired";
-    pose_msg_.header.frame_id = base_frame;
-
     if (!tf_buffer_.canTransform(test_frame, tool_frame, ros::Time(0),
                                  ros::Duration(5.), &pError) )
     {
@@ -146,20 +139,37 @@ bool CalibratingNode::Init() {
         tf2::convert(tf_msg_X_inv_.transform, tf_X_inv_);
     }
 
-    ROS_INFO_STREAM(tf_msg_X_);
-    ROS_INFO_STREAM(tf_msg_X_inv_);
+    // ROS_INFO_STREAM("X transform:"     << std::endl << tf_msg_X_);
+    // ROS_INFO_STREAM("X_inv transform:" << std::endl << tf_msg_X_inv_);
 
+    // Initialize robot interface
     robot_ = new RobotInterface(planning_group, base_frame);
 
-    // FillTestPlanePlans(verification_plans_, base_frame, 2., 1., 6, 3, -0.5, -1.0, 1.);
+    // Parameter distributions for random poses
+    r_dist      = std::uniform_real_distribution<double>(1.4          , 1.6          );
+    theta_dist1 = std::uniform_real_distribution<double>(5.75 * M_PI_4, 6.25 * M_PI_4);
+    phi_dist1   = std::uniform_real_distribution<double>(0.5  * M_PI_4, 0.75 * M_PI_4);
+    theta_dist2 = std::uniform_real_distribution<double>(5.   * M_PI_4, 7.   * M_PI_4);
+    phi_dist2   = std::uniform_real_distribution<double>(1.25 * M_PI_4, 2.75 * M_PI_4);
 
-    FillTestPlanePlans(verification_plans_, base_frame, 0.5, 0.5, 3, 3, -0.5, -0.75, 1.2);
-    // FillTestPlanePoses(test_poses_, base_frame, 0.5, 0.5, 3, 3, -0.5, -0.75, 1.4);
+    // Initialize message headers
+    tf_msg_pose_.header.frame_id = base_frame;
+    tf_msg_pose_.child_frame_id = "tool0_desired";
+    pose_msg_.header.frame_id = base_frame;
 
-    // MeasureRobot(20);
-    // while (sigint_flag) {
-    ExecuteTestPlans(verification_plans_);
-    //}
+    if (calibrate_flag) {
+        MeasureRobot(calibration_samples);
+    }
+
+    if (test_flag) {
+        FillTestPlanePlans(test_plans_, base_frame, 2., 1., 6, 3, 0.5, -1., 0.8, false);
+        FillTestPlanePlans(test_plans_, base_frame, 2., 1., 6, 3, 0.5, -1., 1.0,  true);
+        FillTestPlanePlans(test_plans_, base_frame, 2., 1., 6, 3, 0.5, -1., 1.2, false);
+
+        while (sigint_flag) {
+            ExecuteTestPlans(test_plans_);
+        }
+    }
 
     return true;
 }
@@ -195,7 +205,7 @@ void CalibratingNode::DevicesCb(const vive_bridge::TrackedDevicesStamped& msg_) 
 }
 
 void CalibratingNode::FillTestPlanePlans(std::vector<moveit::planning_interface::MoveGroupInterface::Plan> &plans_, std::string frame_id, 
-                                         double L, double W, int n, int m, double x_offset, double y_offset, double z_offset)
+                                         double L, double W, int n, int m, double x_offset, double y_offset, double z_offset, bool reverse_order)
 {
     const double h_L = L/n;
     const double h_W = W/m;
@@ -208,14 +218,18 @@ void CalibratingNode::FillTestPlanePlans(std::vector<moveit::planning_interface:
     geometry_msgs::PoseStamped pose_;
     pose_.header.frame_id = frame_id;
 
+    // Number of failed plans
+    int n_failed_plans = 0;
     // Direction
     int dir = 1;
+    // Reverse order
+    int rev = 1 - 2*((int) reverse_order);
 
     for (int i = 0; i <= n; i++) {
         for (int j = 0; j <= m; j++) {
-            pose_.pose.position.x = x_offset +      h_L*i - L_2;
-            pose_.pose.position.y = y_offset + dir*(h_W*j - W_2);
-            pose_.pose.position.z = z_offset;
+            pose_.pose.position.x = -x_offset + rev*(     h_L*i - L_2 );
+            pose_.pose.position.y =  y_offset + rev*(dir*(h_W*j - W_2));
+            pose_.pose.position.z =  z_offset;
 
             pose_.pose.orientation.x = 1.;
             pose_.pose.orientation.y = 0.;
@@ -233,10 +247,13 @@ void CalibratingNode::FillTestPlanePlans(std::vector<moveit::planning_interface:
             tf2::toMsg((tf_pose_).inverseTimes(pose_offset_*tf_X_), pose_.pose);
             pose_.header.stamp = ros::Time::now();
 
-            ROS_INFO_STREAM(pose_);
-
             robot_->SetPoseTarget(pose_);
-            robot_->GetPlan(plans_[plans_sz + i*(m + 1) + j]);
+            if (!robot_->GetPlan(plans_[plans_sz + i*(m + 1) + j - n_failed_plans]) ) {
+                ROS_WARN_STREAM("Failed planning trajectory to pose:" << std::endl << pose_);
+
+                plans_.pop_back();
+                n_failed_plans++;
+            }
         }
 
         dir *= -1;
@@ -266,12 +283,14 @@ void CalibratingNode::ExecuteTestPlans(std::vector<moveit::planning_interface::M
                 break;
             }
 
+            ros::Duration(600.).sleep();
+
             std::string pError;
             if (tf_buffer_.canTransform(test_frame, controller_frame, ros::Time(0), &pError) &&
                 tf_buffer_.canTransform(test_frame, base_frame, ros::Time(0), &pError) )
             {
                 tf_msg_diff_ = tf_buffer_.lookupTransform(test_frame, ros::Time(0), controller_frame, ros::Time(0), test_frame);
-                SampleSensor(controller_frame, test_frame, 90, 30, tf_msg_diff_);
+                SampleSensor(controller_frame, test_frame, 480, 30, tf_msg_diff_);
                 tf_msg_sensor_ = tf_buffer_.lookupTransform(base_frame, ros::Time(0), test_frame, ros::Time(0), base_frame);
                 tf_msg_tool0_ = tf_buffer_.lookupTransform(base_frame, ros::Time(0), tool_frame, ros::Time(0), base_frame);
 
@@ -286,6 +305,8 @@ void CalibratingNode::ExecuteTestPlans(std::vector<moveit::planning_interface::M
 
     robot_->SetJointValueTarget(joints_home);
     robot_->MoveIt();
+
+    ros::Duration(600.).sleep();
 
     // Sample origin
     tf_msg_diff_ = tf_buffer_.lookupTransform(test_frame, ros::Time(0), controller_frame, ros::Time(0), test_frame);
@@ -402,13 +423,15 @@ void CalibratingNode::MeasureRobot(const int &N) {
     ROS_INFO_STREAM("0/" << N << ":");
     if (robot_->ExecutePlan(calibration_plans_[0] ) )
     {
+        ros::Duration(150.).sleep();
+
         std::string pError;
         if (tf_buffer_.canTransform(tool_frame, base_frame, ros::Time(0), &pError) &&
             tf_buffer_.canTransform(vr_frame, controller_frame, ros::Time(0), &pError) )
         {
             // Lookup and convert necessary transforms from msgs
             tf_msg_tool0_ = tf_buffer_.lookupTransform(base_frame, ros::Time(0), tool_frame, ros::Time(0), base_frame);
-            SampleSensor(vr_frame, controller_frame, 90, 30, tf_msg_sensor_);
+            SampleSensor(vr_frame, controller_frame, 180, 30, tf_msg_sensor_);
 
             bag_.write("tool0", ros::Time::now(), tf_msg_tool0_);
             bag_.write("sensor", ros::Time::now(), tf_msg_sensor_);
@@ -427,12 +450,14 @@ void CalibratingNode::MeasureRobot(const int &N) {
                 ptrdiff_t i = std::distance(calibration_plans_.begin(), it_);
                 ROS_INFO_STREAM(i << "/" << N << ":");
                 if (robot_->ExecutePlan(*it_) ) {
+                    ros::Duration(150.).sleep();
+
                     if (tf_buffer_.canTransform(base_frame, tool_frame, ros::Time(0), &pError) &&
                         tf_buffer_.canTransform(vr_frame, controller_frame, ros::Time(0), &pError) )
                     {
                         // Lookup and convert necessary transforms
                         tf_msg_tool0_ = tf_buffer_.lookupTransform(base_frame, ros::Time(0), tool_frame, ros::Time(0), base_frame);
-                        SampleSensor(vr_frame, controller_frame, 90, 30, tf_msg_sensor_);
+                        SampleSensor(vr_frame, controller_frame, 180, 30, tf_msg_sensor_);
 
                         bag_.write("tool0", ros::Time::now(), tf_msg_tool0_);
                         bag_.write("sensor", ros::Time::now(), tf_msg_sensor_);
@@ -469,7 +494,7 @@ void CalibratingNode::MeasureRobot(const int &N) {
     robot_->SetJointValueTarget(joints_home);
     robot_->MoveIt();
 
-    // ros::Duration(22.).sleep();
+    ros::Duration(600.).sleep();
 
     if (!(CalibrateViveNode() ) ) {
         ROS_ERROR("Failed solving the provided AX=XB problem");

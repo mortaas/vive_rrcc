@@ -41,15 +41,13 @@ class RobotInterface {
     // MoveIt!
     moveit::planning_interface::MoveGroupInterface move_group_;
     // RobotState
-    robot_model_loader::RobotModelLoader robot_model_loader_;
-    robot_model::RobotModelPtr kinematic_model_;
+    robot_model::RobotModelConstPtr kinematic_model_;
     robot_state::RobotStatePtr kinematic_state_;
-    const robot_state::JointModelGroup* joint_model_group_;
 
     std::vector<std::string> joint_names;
 
     // Eigen
-    Eigen::Affine3d eigen_FK_;
+    Eigen::Affine3d eigen_FK_, eigen_model_planning_;
 
     // tf2
     tf2_ros::Buffer tf_buffer_;

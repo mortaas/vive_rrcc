@@ -7,14 +7,23 @@
 
     <arg name="controller" default="controller_LHR_FDB9BFC4"/>
     <arg name="group"      default="floor_manipulator"/>
+    <arg name="calibrate"  default="true"/>
+    <arg name="test"       default="false"/>
+
+    <arg name="n_cal_samples" default="10"/>
 
     <!-- Launch the calibration node -->
     <node name="parkmartin_node" pkg="vive_calibrating" type="parkmartin_node" output="screen" required="true"/>
 
     <!-- Launch the sampling node -->
     <node name="vive_robot_calibrating_node" pkg="vive_calibrating" type="vive_robot_calibrating_node" output="screen" required="true">
-        <param name="controller_frame" value="$(arg controller)"/>
-        <param name="planning_group" value="$(arg group)"/>
+        <param name="calibrate_flag"                value="$(arg calibrate)"/>
+        <param name="test_flag"                     value="$(arg test)"/>
+
+        <param name="controller_frame"              value="$(arg controller)"/>
+        <param name="planning_group"                value="$(arg group)"/>
+
+        <param name="calibration_samples"           value="$(arg n_cal_samples)"/>
 
         <!-- Sphere sampling parameters for calibration -->
         <param name="radius_lower_bound"            value="1.4"/>
@@ -31,13 +40,13 @@
         <param name="phi_orientation_upper_bound"   value="$(eval 2.75 * arg('M_PI_4') )"/>
 
         <!-- Parameters for sampling of rectangular tracking volume -->
-        <param name="length" value="2."/>
-        <param name="width"  value="1."/>
-        <param name="length_segments" value="6"/>
-        <param name="width_segments"  value="3"/>
-        <param name="x_center" value="-1."/>
-        <param name="y_center" value="-1."/>
-        <param name="z_center" value=" 1."/>
+        <param name="length"                        value="2."/>
+        <param name="width"                         value="1."/>
+        <param name="length_segments"               value="6"/>
+        <param name="width_segments"                value="3"/>
+        <param name="x_center"                      value="-1."/>
+        <param name="y_center"                      value="-1."/>
+        <param name="z_center"                      value=" 1."/>
 
         <!-- Robot and sensor test frames -->
         <rosparam param="base_frame">"floor_base"</rosparam>

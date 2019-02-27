@@ -3,15 +3,15 @@
 RobotInterface::RobotInterface(const std::string &PLANNING_GROUP,
                                const std::string &PLANNING_FRAME) :
     move_group_(moveit::planning_interface::MoveGroupInterface(PLANNING_GROUP) ),
-    robot_model_loader_(robot_model_loader::RobotModelLoader("/robot_description") ),
-    kinematic_model_(robot_model_loader_.getModel() ),
-    kinematic_state_(new robot_state::RobotState(kinematic_model_) ),
-    joint_model_group_(kinematic_model_->getJointModelGroup(PLANNING_GROUP) )
+    kinematic_model_(move_group_.getRobotModel() ),
+    kinematic_state_(move_group_.getCurrentState() )
 {
-    move_group_.clearPoseTargets();
+    move_group_.setStartStateToCurrentState();
 
     // Set planning parameters of the MoveIt! move group
     move_group_.setPoseReferenceFrame(PLANNING_FRAME);
+    // Transform from model frame to planning frame
+    eigen_model_planning_ = kinematic_state_->getFrameTransform(PLANNING_FRAME);
 
     // Initialize transform headers
     tf_msg_.header.frame_id = kinematic_model_->getModelFrame();
@@ -19,7 +19,7 @@ RobotInterface::RobotInterface(const std::string &PLANNING_GROUP,
 
     // Get joint names
     std::vector<std::string> variable_names = kinematic_model_->getVariableNames();
-    joint_names = std::vector<std::string>(variable_names.begin(), variable_names.begin() + 6);
+    joint_names = move_group_.getJointNames();
 }
 
 void RobotInterface::SetPoseTarget(const geometry_msgs::PoseStamped &pose_) {
@@ -47,10 +47,11 @@ bool RobotInterface::GetPlan(moveit::planning_interface::MoveGroupInterface::Pla
       */
 
     if (move_group_.plan(plan_) ) {
+        // Set goal state for this plan as the start state for the next plan
         std::vector<double> position = plan_.trajectory_.joint_trajectory.points.back().positions;
         kinematic_state_->setVariablePositions(joint_names, position);
         move_group_.setStartState(*kinematic_state_);
-
+    
         return true;
     } else {
         return false;
@@ -62,7 +63,7 @@ bool RobotInterface::ExecutePlan(const moveit::planning_interface::MoveGroupInte
       * Executes the provided plan, stop, and wait for the dynamics to settle down.
       * Returns true if trajectory execution succeeded.
       */
-    
+
     // Get plan goal as pose
     std::vector<double> position = plan_.trajectory_.joint_trajectory.points.back().positions;
     kinematic_state_->setVariablePositions(joint_names, position);
