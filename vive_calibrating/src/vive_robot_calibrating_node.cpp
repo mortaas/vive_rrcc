@@ -65,8 +65,8 @@ bool CalibratingNode::InitParams() {
       * Returns true if all the parameters were retrieved from the server, false otherwise.
       */
 
-    joints_home = {1.5707893454778887,    -2.5900040327772613, 2.3999184786133068,
-                    -2.6179938779914945e-05, 0.799936756066561,  8.377580409572782e-05};
+    joints_home = { 1.5707893454778887,    -2.5900040327772613, 2.3999184786133068,
+                   -2.6179938779914945e-05, 0.799936756066561,  8.377580409572782e-05};
 
     if (nh_.param<std::string>("/vive_node/vr_frame",    vr_frame,              "world_vr") &&
         nh_.param<std::string>("/vive_node/world_frame", world_frame,           "root") &&
@@ -77,7 +77,9 @@ bool CalibratingNode::InitParams() {
         pvt_nh_.param<std::string>("tool_frame",         tool_frame,            "floor_tool0") &&
         pvt_nh_.param<std::string>("test_frame",         test_frame,            "controller_test") &&
 
-        pvt_nh_.param("calibration_samples",             calibration_samples,   10) &&
+        pvt_nh_.param("calibration_stations",            calibration_stations,  10) &&
+        pvt_nh_.param("averaging_samples",               averaging_samples,     480) &&
+        pvt_nh_.param("sleep_duration",                  sleep_duration,        600.) &&
 
         pvt_nh_.param("calibrate_flag",                  calibrate_flag,        true)  &&
         pvt_nh_.param("test_flag",                       test_flag,             false) &&
@@ -158,7 +160,7 @@ bool CalibratingNode::Init() {
     pose_msg_.header.frame_id = base_frame;
 
     if (calibrate_flag) {
-        MeasureRobot(calibration_samples);
+        MeasureRobot(calibration_stations);
     }
 
     if (test_flag) {
@@ -283,14 +285,14 @@ void CalibratingNode::ExecuteTestPlans(std::vector<moveit::planning_interface::M
                 break;
             }
 
-            ros::Duration(600.).sleep();
+            ros::Duration(sleep_duration).sleep();
 
             std::string pError;
             if (tf_buffer_.canTransform(test_frame, controller_frame, ros::Time(0), &pError) &&
                 tf_buffer_.canTransform(test_frame, base_frame, ros::Time(0), &pError) )
             {
                 tf_msg_diff_ = tf_buffer_.lookupTransform(test_frame, ros::Time(0), controller_frame, ros::Time(0), test_frame);
-                SampleSensor(controller_frame, test_frame, 480, 30, tf_msg_diff_);
+                SampleSensor(controller_frame, test_frame, averaging_samples, 30, tf_msg_diff_);
                 tf_msg_sensor_ = tf_buffer_.lookupTransform(base_frame, ros::Time(0), test_frame, ros::Time(0), base_frame);
                 tf_msg_tool0_ = tf_buffer_.lookupTransform(base_frame, ros::Time(0), tool_frame, ros::Time(0), base_frame);
 
@@ -306,11 +308,11 @@ void CalibratingNode::ExecuteTestPlans(std::vector<moveit::planning_interface::M
     robot_->SetJointValueTarget(joints_home);
     robot_->MoveIt();
 
-    ros::Duration(600.).sleep();
+    ros::Duration(sleep_duration).sleep();
 
     // Sample origin
     tf_msg_diff_ = tf_buffer_.lookupTransform(test_frame, ros::Time(0), controller_frame, ros::Time(0), test_frame);
-    SampleSensor(controller_frame, test_frame, 480, 30, tf_msg_diff_);
+    SampleSensor(controller_frame, test_frame, averaging_samples, 30, tf_msg_diff_);
     tf_msg_sensor_ = tf_buffer_.lookupTransform(base_frame, ros::Time(0), test_frame, ros::Time(0), base_frame);
     tf_msg_tool0_ = tf_buffer_.lookupTransform(base_frame, ros::Time(0), tool_frame, ros::Time(0), base_frame);
 
@@ -356,30 +358,36 @@ geometry_msgs::Pose CalibratingNode::GenerateRandomPose(geometry_msgs::Pose &pos
     return pose_;
 }
 
-void CalibratingNode::SampleSensor(const std::string &target_frame, const std::string &source_frame,
+bool CalibratingNode::SampleSensor(const std::string &target_frame, const std::string &source_frame,
                                    const int &N, const int &F, geometry_msgs::TransformStamped &tf_msg_avg_)
 {
-    ros::Rate sample_rate_(F);
+    if (tf_buffer_.canTransform(target_frame, source_frame, ros::Time(0) ) ) {
+        ros::Rate sample_rate_(F);
 
-    eigen_translations_.resize(N);
-    eigen_rotations_.resize(N);
+        eigen_translations_.resize(N);
+        eigen_rotations_.resize(N);
 
-    // Sample N sensor poses with provided sample rate
-    for (int i = 0; i < N; i++) {
-        tf_msg_sensor_ = tf_buffer_.lookupTransform(target_frame, ros::Time(0), source_frame, ros::Time(0), target_frame);
+        // Sample N sensor poses with provided sample rate
+        for (int i = 0; i < N; i++) {
+            tf_msg_sensor_ = tf_buffer_.lookupTransform(target_frame, ros::Time(0), source_frame, ros::Time(0), target_frame);
 
-        tf2::fromMsg(tf_msg_sensor_.transform.translation, eigen_translations_[i]);
-        tf2::fromMsg(tf_msg_sensor_.transform.rotation, eigen_rotations_[i]);
+            tf2::fromMsg(tf_msg_sensor_.transform.translation, eigen_translations_[i]);
+            tf2::fromMsg(tf_msg_sensor_.transform.rotation, eigen_rotations_[i]);
 
-        sample_rate_.sleep();
+            sample_rate_.sleep();
+        }
+
+        // Return averaged pose as transform msg
+        geometry_msgs::Point tf_translation_ = tf2::toMsg(dr::averagePositions<double>(eigen_translations_) );
+        tf_msg_avg_.transform.translation.x = tf_translation_.x;
+        tf_msg_avg_.transform.translation.y = tf_translation_.y;
+        tf_msg_avg_.transform.translation.z = tf_translation_.z;
+        tf_msg_avg_.transform.rotation = tf2::toMsg(dr::averageQuaternions<double>(eigen_rotations_) );
+
+        return true;
+    } else {
+        return false;
     }
-
-    // Return averaged pose as transform msg
-    geometry_msgs::Point tf_translation_ = tf2::toMsg(dr::averagePositions<double>(eigen_translations_) );
-    tf_msg_avg_.transform.translation.x = tf_translation_.x;
-    tf_msg_avg_.transform.translation.y = tf_translation_.y;
-    tf_msg_avg_.transform.translation.z = tf_translation_.z;
-    tf_msg_avg_.transform.rotation = tf2::toMsg(dr::averageQuaternions<double>(eigen_rotations_) );
 }
 
 void CalibratingNode::MeasureRobot(const int &N) {
@@ -423,7 +431,7 @@ void CalibratingNode::MeasureRobot(const int &N) {
     ROS_INFO_STREAM("0/" << N << ":");
     if (robot_->ExecutePlan(calibration_plans_[0] ) )
     {
-        ros::Duration(150.).sleep();
+        ros::Duration(sleep_duration).sleep();
 
         std::string pError;
         if (tf_buffer_.canTransform(tool_frame, base_frame, ros::Time(0), &pError) &&
@@ -450,7 +458,7 @@ void CalibratingNode::MeasureRobot(const int &N) {
                 ptrdiff_t i = std::distance(calibration_plans_.begin(), it_);
                 ROS_INFO_STREAM(i << "/" << N << ":");
                 if (robot_->ExecutePlan(*it_) ) {
-                    ros::Duration(150.).sleep();
+                    ros::Duration(sleep_duration).sleep();
 
                     if (tf_buffer_.canTransform(base_frame, tool_frame, ros::Time(0), &pError) &&
                         tf_buffer_.canTransform(vr_frame, controller_frame, ros::Time(0), &pError) )
@@ -537,30 +545,32 @@ bool CalibratingNode::CalibrateViveNode() {
             tf_msg_ = tf_buffer_.lookupTransform(world_frame, ros::Time(0), tool_frame, ros::Time(0), world_frame);
             tf2::fromMsg(tf_msg_.transform, tf_tool0_[1]);
 
-            // tf_msg_ = tf_buffer_.lookupTransform(controller_frame, ros::Time(0), vr_frame, ros::Time(0), controller_frame);
-            SampleSensor(controller_frame, vr_frame, 480, 30, tf_msg_);
-            tf2::fromMsg(tf_msg_.transform, tf_controller_);
+            if (SampleSensor(controller_frame, vr_frame, averaging_samples, 30, tf_msg_) ) {
+                tf2::fromMsg(tf_msg_.transform, tf_controller_);
 
-            tf_controller_ = tf_tool0_[1]*tf_X_*tf_controller_;
+                tf_controller_ = tf_tool0_[1]*tf_X_*tf_controller_;
 
-            // Set new offset parameters based on transformation
-            srv_reconf_req_.config.doubles[0].value = tf_controller_.getOrigin().getX();
-            srv_reconf_req_.config.doubles[1].value = tf_controller_.getOrigin().getY();
-            srv_reconf_req_.config.doubles[2].value = tf_controller_.getOrigin().getZ();
-            tf_controller_.getBasis().getRPY(roll_offset, pitch_offset, yaw_offset);
-            srv_reconf_req_.config.doubles[3].value = yaw_offset;
-            srv_reconf_req_.config.doubles[4].value = pitch_offset;
-            srv_reconf_req_.config.doubles[5].value = roll_offset;
-            // Send request to the dynamic reconfigure service in vive_node
-            ros::service::call("/vive_node/set_parameters", srv_reconf_req_, srv_reconf_resp_);
+                // Set new offset parameters based on transformation
+                srv_reconf_req_.config.doubles[0].value = tf_controller_.getOrigin().getX();
+                srv_reconf_req_.config.doubles[1].value = tf_controller_.getOrigin().getY();
+                srv_reconf_req_.config.doubles[2].value = tf_controller_.getOrigin().getZ();
+                tf_controller_.getBasis().getRPY(roll_offset, pitch_offset, yaw_offset);
+                srv_reconf_req_.config.doubles[3].value = yaw_offset;
+                srv_reconf_req_.config.doubles[4].value = pitch_offset;
+                srv_reconf_req_.config.doubles[5].value = roll_offset;
+                // Send request to the dynamic reconfigure service in vive_node
+                ros::service::call("/vive_node/set_parameters", srv_reconf_req_, srv_reconf_resp_);
 
-            return true;
+                return true;
+            } else {
+                return false;
+            } // if (SampleSensor(controller_frame, vr_frame, averaging_samples, 30, tf_msg_) )
         } else {
             return false;
-        }
+        } // if (compute_srv.response.success)
 
         return false;
-    }
+    } // if (compute_client.call(compute_srv) )
 }
 
 

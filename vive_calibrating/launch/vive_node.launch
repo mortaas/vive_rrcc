@@ -7,10 +7,13 @@
 
     <arg name="controller" default="controller_LHR_FDB9BFC4"/>
     <arg name="group"      default="floor_manipulator"/>
+
     <arg name="calibrate"  default="true"/>
     <arg name="test"       default="false"/>
 
-    <arg name="n_cal_samples" default="10"/>
+    <arg name="stations"   default="10"/>
+    <arg name="samples"    default="480"/>
+    <arg name="duration"   default="600."/>
 
     <!-- Launch the calibration node -->
     <node name="parkmartin_node" pkg="vive_calibrating" type="parkmartin_node" output="screen" required="true"/>
@@ -23,7 +26,9 @@
         <param name="controller_frame"              value="$(arg controller)"/>
         <param name="planning_group"                value="$(arg group)"/>
 
-        <param name="calibration_samples"           value="$(arg n_cal_samples)"/>
+        <param name="calibration_stations"          value="$(arg stations)"/>
+        <param name="averaging_samples"             value="$(arg samples)"/>
+        <param name="sleep_duration"                value="$(arg duration)"/>
 
         <!-- Sphere sampling parameters for calibration -->
         <param name="radius_lower_bound"            value="1.4"/>
@@ -42,8 +47,10 @@
         <!-- Parameters for sampling of rectangular tracking volume -->
         <param name="length"                        value="2."/>
         <param name="width"                         value="1."/>
+        
         <param name="length_segments"               value="6"/>
         <param name="width_segments"                value="3"/>
+
         <param name="x_center"                      value="-1."/>
         <param name="y_center"                      value="-1."/>
         <param name="z_center"                      value=" 1."/>

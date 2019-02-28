@@ -61,7 +61,7 @@ set(OPENVR_INCLUDE_DIR ${OPENVR}/headers)
 
 ## Set libsurvive library path
 ## ENV reads paths from a system environment variable
-set(SURVIVE "$ENV{HOME}/libsurvive")
+set(SURVIVE "$ENV{HOME}/lib/libsurvive")
 
 ## OpenVR SDK path
 find_library(SURVIVE_LIBRARIES

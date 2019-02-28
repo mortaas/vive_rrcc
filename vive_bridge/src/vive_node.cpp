@@ -386,8 +386,10 @@ void ViveNode::Loop() {
         // Handle controller events
         switch (event_type) {
             case vr::VREvent_ButtonPress:   TrackedDevices[event_device_index].controller_interaction = true;
+                                            ROS_INFO("Button press!");
                                             break;
             case vr::VREvent_ButtonUnpress: TrackedDevices[event_device_index].controller_interaction = true;
+                                            ROS_INFO("Button unpress!");
                                             break;
             case vr::VREvent_ButtonTouch:   TrackedDevices[event_device_index].button_touched = true;
                                             vr_.GetControllerState(event_device_index,

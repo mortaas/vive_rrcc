@@ -29,12 +29,14 @@ typedef boost::function<void(const std::string&)> FatalMsgCallback;
 class ViveInterface {
     // OpenVR
     vr::TrackedDevicePose_t device_poses_[8];
+    vr::VRControllerState_t controller_states_[8];
 
     // libsurvive
     SurviveSimpleContext *actx_;
 
-    SurvivePose survive_pose_;
     FLT ogl_pose[16];
+    SurvivePose survive_pose_;
+    SurviveVelocity survive_velocity_;
 
     std::array<int, 8> device_classes_;
     std::array<std::string, 8> device_names_;

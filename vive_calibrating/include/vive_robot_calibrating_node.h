@@ -84,8 +84,8 @@ class CalibratingNode {
 
     // Parameters
     bool calibrate_flag, test_flag;
-    int calibration_samples;
-    double yaw_offset, pitch_offset, roll_offset;
+    int averaging_samples, calibration_stations;
+    double sleep_duration, yaw_offset, pitch_offset, roll_offset;
     std::string vr_frame,   controller_frame, test_frame,
                 base_frame, tool_frame,       world_frame;
 
@@ -116,7 +116,7 @@ class CalibratingNode {
     bool CalibrateViveNode();
     void MeasureRobot(const int &N);
 
-    void SampleSensor(const std::string &target_frame, const std::string &source_frame,
+    bool SampleSensor(const std::string &target_frame, const std::string &source_frame,
                       const int &N, const int &F, geometry_msgs::TransformStamped &tf_msg_avg_);
     std::vector<Eigen::Vector3d> eigen_translations_;
     std::vector<Eigen::Quaterniond> eigen_rotations_;

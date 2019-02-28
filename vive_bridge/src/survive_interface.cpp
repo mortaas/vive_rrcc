@@ -18,83 +18,36 @@ inline void DefaultFatalMsgCallback(const std::string &msg) {
     std::cerr << "VR Fatal: " << msg << std::endl;
 }
 
-static std::queue<int> controller_event_type, controller_device_index;
 
-// static std::queue<std::string> error_queue, info_queue;
-// static void error_fn(SurviveContext * ctx, const char * fault) {
-//     struct SurviveSimpleContext *actx = (struct SurviveSimpleContext *) ctx->user_ptr;
-// 	OGLockMutex(actx->poll_mutex);
+struct SurviveExternalObject {
+	SurvivePose pose;
+	SurviveVelocity velocity;
+};
 
-//     error_queue.push(std::string(fault) );
-//     printf("[VR] %s \n", fault);
+struct SurviveLighthouseData {
+	int lighthouse;
+	char serial_number[16];
+};
 
-//     OGUnlockMutex(actx->poll_mutex);
-// }
-// static void info_fn(SurviveContext * ctx, const char * fault) {
-//     struct SurviveSimpleContext *actx = (struct SurviveSimpleContext *) ctx->user_ptr;
-// 	OGLockMutex(actx->poll_mutex);
+struct SurviveSimpleObject {
+	struct SurviveSimpleContext *actx;
 
-//     info_queue.push(std::string(fault) );
+	enum SurviveSimpleObject_type {
+		SurviveSimpleObject_LIGHTHOUSE,
+		SurviveSimpleObject_OBJECT,
+		SurviveSimpleObject_EXTERNAL
+	} type;
 
-//     OGUnlockMutex(actx->poll_mutex);
-// }
+	union {
+		struct SurviveLighthouseData lh;
+		struct SurviveObject *so;
+		struct SurviveExternalObject seo;
+	} data;
 
-static void light_process( SurviveObject * so, int sensor_id, int acode, int timeinsweep, uint32_t timecode, uint32_t length, uint32_t lh)
-{
-    survive_default_light_process(so, sensor_id, acode, timeinsweep, timecode, length, lh);
+	char name[32];
+	bool has_update;
+};
 
-    if (std::string(so->codename) == "T20") {
-        printf("Light: [%u][lh %u][%s][acode %u][sensor %u][time in sweep %u][length %u]\n", timecode,
-            lh, so->codename, acode, sensor_id, timeinsweep, length);
-    }
-}
-
-static void imu_process(SurviveObject * so, int mask, FLT * accelgyromag, uint32_t timecode, int id)
-{
-    struct SurviveSimpleContext *actx = (struct SurviveSimpleContext *) so->ctx->user_ptr;
-
-	OGLockMutex(actx->poll_mutex);
-
-	    survive_default_imu_process(so, mask, accelgyromag, timecode, id);
-
-    OGUnlockMutex(actx->poll_mutex);
-}
-
-static void button_process(SurviveObject *so, uint8_t eventType, uint8_t buttonId, uint8_t axis1Id, uint16_t axis1Val, uint8_t axis2Id, uint16_t axis2Val)
-{
-    survive_default_button_process(so, eventType, buttonId, axis1Id, axis1Val, axis2Id, axis2Val);
-
-    void *ptr = so;
-
-    struct SurviveSimpleContext *actx = (struct SurviveSimpleContext *) so->ctx->user_ptr;
-    intptr_t i = (intptr_t) so->user_ptr;
-
-    OGLockMutex(actx->poll_mutex);
-
-    switch(eventType) {
-        case BUTTON_EVENT_BUTTON_DOWN :
-            controller_device_index.push(i);
-            controller_event_type.push(200); // ButtonPress
-            break;
-        case BUTTON_EVENT_BUTTON_UP :
-            controller_device_index.push(i);
-            controller_event_type.push(201); // ButtonUnpress
-            break;
-        case BUTTON_EVENT_AXIS_CHANGED :
-            if (axis1Val + axis2Val != 0.) {
-                controller_device_index.push(i);
-                controller_event_type.push(202); // ButtonTouch
-            } else {
-                controller_device_index.push(i);
-                controller_event_type.push(203); // ButtonUntouch
-            }
-            break;
-        case BUTTON_EVENT_BUTTON_NONE :
-            break;
-    }
-
-    OGUnlockMutex(actx->poll_mutex);
-}
 
 ViveInterface::ViveInterface()
     : VR_DEBUG(DefaultDebugMsgCallback),
@@ -115,15 +68,6 @@ bool ViveInterface::Init(int argc, char **argv) {
      */
 
     actx_ = survive_simple_init(argc, argv);
-
-    // Install callback functions
-    survive_install_button_fn(actx_->ctx, button_process);
-    survive_install_imu_fn(actx_->ctx, imu_process);
-
-    // survive_install_light_fn(actx_->ctx, light_process);
-
-    // survive_install_error_fn(actx_->ctx, error_fn);
-    // survive_install_info_fn(actx_->ctx, info_fn);
 
     // Check if libsurvive was initialized properly
     if (actx_ == nullptr) {
@@ -174,44 +118,26 @@ void ViveInterface::GetControllerState(const int &device_index, std::vector<floa
      * Get controller state and map it to axes and buttons
      */
 
-    OGLockMutex(actx_->poll_mutex);
+    // Axes
+    axes[0] = controller_states_[device_index].rAxis[0].x;
+    axes[1] = controller_states_[device_index].rAxis[0].y;
+    axes[2] = controller_states_[device_index].rAxis[1].x;
 
-        const struct SurviveObject *so_ = actx_->objects[device_index].data.so;
-
-        axes.assign(3, 0.);
-        axes[0] = so_->axis1 / 32640.;
-        axes[1] = so_->axis2 / 32767.;
-        axes[2] = so_->axis3 / 32767.;
-
-        buttons.assign(13, 0);
-        if ( so_->buttonmask &  1)       { buttons[3] = 1; } // Trigger
-        if ((so_->buttonmask &  6) == 6) { buttons[2] = 1; } // Touchpad
-        if ((so_->buttonmask & 16) >> 4) { buttons[1] = 1; } // Grip
-        if ((so_->buttonmask & 32) >> 5) { buttons[0] = 1; } // Menu
-
-    OGUnlockMutex(actx_->poll_mutex);
+    // Buttons
+    buttons.assign(13, 0);
+    if (vr::ButtonMaskFromId(vr::k_EButton_ApplicationMenu) & controller_states_[device_index].ulButtonPressed) {
+        buttons[0] = 1;
+    }
+    if (vr::ButtonMaskFromId(vr::k_EButton_Dashboard_Back) & controller_states_[device_index].ulButtonPressed) {
+        buttons[1] = 1;
+    }
+    if (vr::ButtonMaskFromId(vr::k_EButton_SteamVR_Touchpad) & controller_states_[device_index].ulButtonPressed) {
+        buttons[2] = 1;
+    }
+    if (vr::ButtonMaskFromId(vr::k_EButton_SteamVR_Trigger) & controller_states_[device_index].ulButtonPressed) {
+        buttons[3] = 1;
+    }
 }
-
-// void ViveInterface::PollNextMessage() {
-//       /**
-//      * Get and display next message from libsurvive
-//      */
-
-//     struct SurviveSimpleContext *actx = (struct SurviveSimpleContext *) actx_->ctx->user_ptr;
-
-//     OGLockMutex(actx->poll_mutex);
-
-//     while (!error_queue.empty() ) {
-//         VR_ERROR(error_queue.front() );
-//         info_queue.pop();
-//     }
-//     while (!info_queue.empty() ) {
-//         VR_INFO(info_queue.front() );
-//         info_queue.pop();
-//     }
-
-//     OGUnlockMutex(actx->poll_mutex);
-// }
 
 bool ViveInterface::PollNextEvent(int &event_type, int &device_index) {
       /**
@@ -221,25 +147,80 @@ bool ViveInterface::PollNextEvent(int &event_type, int &device_index) {
      * if there is no event waiting in the event queue.
      */
 
-    OGLockMutex(actx_->poll_mutex);
+    SurviveSimpleEvent event_ = {};
+    survive_simple_next_event(actx_, &event_);
 
-    if (!controller_event_type.empty() ) {
-        event_type = controller_event_type.front();
-        device_index = controller_device_index.front();
+    switch (event_.event_type) {
+        case SurviveSimpleEventType_ButtonEvent: {
+            const struct SurviveSimpleButtonEvent *button_event_ = survive_simple_get_button_event(&event_);
+            const SurviveSimpleObject *fsao_ = survive_simple_get_first_object(actx_);
+            const SurviveSimpleObject *sao = button_event_->object;
 
-        controller_event_type.pop();
-        controller_device_index.pop();
-    } else {
-        event_type = 0;
-        device_index = 0xFFFFFFFF;
-    }
+            std::ptrdiff_t i = std::distance(fsao_, sao);
+            device_index = (int) i;
 
-    OGUnlockMutex(actx_->poll_mutex);
+            VR_INFO(std::to_string(i) );
 
-    if (!(event_type == 0 && device_index == 0xFFFFFFFF) ) {
-        return true;
-    } else {
-        return false;
+            switch(button_event_->event_type) {
+                case BUTTON_EVENT_BUTTON_DOWN:
+                    event_type = 200; // ButtonPress
+
+                    if (button_event_->button_id == 2) { // Touchpad button
+                        controller_states_[i].ulButtonPressed |= 1ull << 32;
+                    }
+                    if (button_event_->button_id == 4) { // Grip button
+                        controller_states_[i].ulButtonPressed |= 1ull << 2;
+                    }
+                    if (button_event_->button_id == 5) { // Menu button
+                        controller_states_[i].ulButtonPressed |= 1ull << 1;
+                    }
+                    if (button_event_->button_id == 24) { // Trigger button
+                        controller_states_[i].ulButtonPressed |= 1ull << 33;
+                    }
+
+                    break;
+                case BUTTON_EVENT_BUTTON_UP:
+                    event_type = 201; // ButtonUnpress
+
+                    if (button_event_->button_id == 2) { // Touchpad button
+                        controller_states_[i].ulButtonPressed &= !(1ull << 32);
+                    }
+                    if (button_event_->button_id == 4) { // Grip button
+                        controller_states_[i].ulButtonPressed &= !(1ull <<  2);
+                    }
+                    if (button_event_->button_id == 5) { // Menu button
+                        controller_states_[i].ulButtonPressed &= !(1ull <<  1);
+                    }
+                    if (button_event_->button_id == 24) { // Trigger button
+                        controller_states_[i].ulButtonPressed &= !(1ull << 33);
+                    }
+
+                    break;
+                case BUTTON_EVENT_AXIS_CHANGED:
+                    if (button_event_->axis_val[0] + button_event_->axis_val[1] != 0.) {
+                        event_type = 202; // ButtonTouch
+                    } else {
+                        event_type = 203; // ButtonUntouch
+                    }
+                    break;
+                case BUTTON_EVENT_BUTTON_NONE:
+                    break;
+            }
+
+            if (event_type == 202 || event_type == 203)
+            {
+                if (button_event_->axis_ids[0] == 1) {
+                    controller_states_[i].rAxis[1].x = button_event_->axis_val[0] / 32640.; // Trigger
+                } else {
+                    controller_states_[i].rAxis[0].x = (int16_t) button_event_->axis_val[0] / 32767.; // Touchpad x
+                    controller_states_[i].rAxis[0].y = (int16_t) button_event_->axis_val[1] / 32767.; // Touchpad y
+                }
+            }
+
+            break;
+        }
+        case SurviveSimpleEventType_None:
+            break;
     }
 }
 
@@ -290,18 +271,10 @@ void ViveInterface::GetDeviceVelocity(const int &device_index, float linear[3], 
      * Get the linear and angular velocity (twist) of a tracked device
      */
 
-    OGLockMutex(actx_->poll_mutex);
-
-        struct SurviveObject *so_ = actx_->objects[device_index].data.so;
-        SurviveSensorActivations *ssa_ = &so_->activations;
-
-        for (int i = 0; i < 3; i++) {
-            // Compute calibrated linear and angular velocities
-            linear[i]  = so_->acc_scale[i]  * ssa_->accel[i] + so_->acc_bias[i];
-            angular[i] = so_->gyro_scale[i] * ssa_->gyro[i]  + so_->gyro_bias[i];
-        }
-    
-    OGUnlockMutex(actx_->poll_mutex);
+    for (int i = 0; i < 3; i++) {
+        linear[i] = device_poses_[device_index].vVelocity.v[i];
+        angular[i] = device_poses_[device_index].vAngularVelocity.v[i];
+    }
 }
 
 int ViveInterface::GetDeviceClass(const int &device_index) {
@@ -318,7 +291,7 @@ bool ViveInterface::PoseIsValid(const int &device_index) {
      */
 
     // Check if the device is populated
-    if ((actx_->object_ct - device_index) >= 0) {
+    if ((survive_simple_get_object_count(actx_) - device_index) >= 0) {
         return true;
     } else {
         return false;
@@ -331,18 +304,20 @@ void ViveInterface::Update() {
     */
 
     if (survive_simple_is_running(actx_) ) {
-        const SurviveSimpleObject *fsao_;
-        fsao_ = survive_simple_get_first_object(actx_);
+        const SurviveSimpleObject *fsao_ = survive_simple_get_first_object(actx_);
 
         for (const SurviveSimpleObject *it_ = survive_simple_get_next_updated(actx_); it_ != nullptr;
 			                            it_ = survive_simple_get_next_updated(actx_) )
         {
             std::ptrdiff_t i = std::distance(fsao_, it_);
 
-            uint32_t timecode = survive_simple_object_get_latest_pose(it_, &survive_pose_);
+            survive_simple_object_get_latest_pose(it_, &survive_pose_);
+            survive_simple_object_get_latest_velocity(it_, &survive_velocity_);
 
             PoseToMatrix(ogl_pose, &survive_pose_);
             std::copy(ogl_pose, ogl_pose + 16, &device_poses_[i].mDeviceToAbsoluteTracking.m[0][0]);
+            std::copy(survive_velocity_.Pos, survive_velocity_.Pos + 3, &device_poses_[i].vVelocity.v[0]);
+            std::copy(survive_velocity_.AxisAngleRot, survive_velocity_.AxisAngleRot + 3, &device_poses_[i].vAngularVelocity.v[0]);
         }
     }
 }
@@ -352,11 +327,11 @@ void ViveInterface::TriggerHapticPulse(const int &device_index, const int &axis_
     * Triggers a single haptic pulse on a controller given its device index, and the pulse duration 0-3999 µs ("strength")
     */
 
-    for (int i = 0; i < 0x5; i++)
-    {
-        survive_haptic(actx_->objects[device_index].data.so, 0, 0xf401, 0xb5a2, 0x0100);
-        OGUSleep(1000);
-    }
+    // for (int i = 0; i < 0x5; i++)
+    // {
+    //     survive_haptic(actx_->objects[device_index].data.so, 0, 0xf401, 0xb5a2, 0x0100);
+    //     OGUSleep(1000);
+    // }
 }
 
 // Logging to ROS
