@@ -65,26 +65,37 @@ bool CalibratingNode::InitParams() {
       * Returns true if all the parameters were retrieved from the server, false otherwise.
       */
 
-    joints_home = { 1.5707893454778887,    -2.5900040327772613, 2.3999184786133068,
-                   -2.6179938779914945e-05, 0.799936756066561,  8.377580409572782e-05};
+    joints_home = {0.0, -1.5708155254166685, 1.5708399600261964, 0.0, 2.6179938779914945e-05, 0.0};
 
-    if (nh_.param<std::string>("/vive_node/vr_frame",    vr_frame,              "world_vr") &&
+    if (pvt_nh_.param<std::string>("planning_group",     planning_group,        "floor_manipulator") &&
+
+        // Coordinate frames
+        nh_.param<std::string>("/vive_node/vr_frame",    vr_frame,              "world_vr") &&
         nh_.param<std::string>("/vive_node/world_frame", world_frame,           "root") &&
 
-        pvt_nh_.param<std::string>("planning_group",     planning_group,        "floor_manipulator") &&
         pvt_nh_.param<std::string>("controller_frame",   controller_frame,      "") &&
         pvt_nh_.param<std::string>("base_frame",         base_frame,            "floor_base") &&
         pvt_nh_.param<std::string>("tool_frame",         tool_frame,            "floor_tool0") &&
         pvt_nh_.param<std::string>("test_frame",         test_frame,            "controller_test") &&
+
+        // Random Pose Generator bounds
+        pvt_nh_.getParam("radius_lower_bound",            radius_lower_bound) &&
+        pvt_nh_.getParam("radius_upper_bound",            radius_upper_bound) &&
+        pvt_nh_.getParam("phi_position_lower_bound",      phi_position_lower_bound) &&
+        pvt_nh_.getParam("phi_position_upper_bound",      phi_position_upper_bound) &&
+        pvt_nh_.getParam("phi_orientation_lower_bound",   phi_orientation_lower_bound) &&
+        pvt_nh_.getParam("phi_orientation_upper_bound",   phi_orientation_upper_bound) &&
+        pvt_nh_.getParam("theta_position_lower_bound",    theta_position_lower_bound) &&
+        pvt_nh_.getParam("theta_position_upper_bound",    theta_position_upper_bound) &&
+        pvt_nh_.getParam("theta_orientation_lower_bound", theta_orientation_lower_bound) &&
+        pvt_nh_.getParam("theta_orientation_upper_bound", theta_orientation_upper_bound) &&
 
         pvt_nh_.param("calibration_stations",            calibration_stations,  10) &&
         pvt_nh_.param("averaging_samples",               averaging_samples,     480) &&
         pvt_nh_.param("sleep_duration",                  sleep_duration,        600.) &&
 
         pvt_nh_.param("calibrate_flag",                  calibrate_flag,        true)  &&
-        pvt_nh_.param("test_flag",                       test_flag,             false) &&
-
-        pvt_nh_.getParam("joints_folded", joints_home) )
+        pvt_nh_.param("test_flag",                       test_flag,             false) )
     {
         return true;
     } else {
@@ -148,11 +159,11 @@ bool CalibratingNode::Init() {
     robot_ = new RobotInterface(planning_group, base_frame);
 
     // Parameter distributions for random poses
-    r_dist      = std::uniform_real_distribution<double>(1.4          , 1.6          );
-    theta_dist1 = std::uniform_real_distribution<double>(5.75 * M_PI_4, 6.25 * M_PI_4);
-    phi_dist1   = std::uniform_real_distribution<double>(0.5  * M_PI_4, 0.75 * M_PI_4);
-    theta_dist2 = std::uniform_real_distribution<double>(5.   * M_PI_4, 7.   * M_PI_4);
-    phi_dist2   = std::uniform_real_distribution<double>(1.25 * M_PI_4, 2.75 * M_PI_4);
+    r_dist      = std::uniform_real_distribution<double>(radius_lower_bound, radius_upper_bound);
+    theta_dist1 = std::uniform_real_distribution<double>(theta_position_lower_bound, theta_position_upper_bound);
+    phi_dist1   = std::uniform_real_distribution<double>(phi_position_lower_bound, phi_position_upper_bound);
+    theta_dist2 = std::uniform_real_distribution<double>(theta_orientation_lower_bound, theta_orientation_upper_bound);
+    phi_dist2   = std::uniform_real_distribution<double>(phi_orientation_lower_bound, phi_orientation_upper_bound);
 
     // Initialize message headers
     tf_msg_pose_.header.frame_id = base_frame;
@@ -163,10 +174,17 @@ bool CalibratingNode::Init() {
         MeasureRobot(calibration_stations);
     }
 
-    if (test_flag) {
-        FillTestPlanePlans(test_plans_, base_frame, 2., 1., 6, 3, 0.5, -1., 0.8, false);
-        FillTestPlanePlans(test_plans_, base_frame, 2., 1., 6, 3, 0.5, -1., 1.0,  true);
-        FillTestPlanePlans(test_plans_, base_frame, 2., 1., 6, 3, 0.5, -1., 1.2, false);
+    if (test_flag && sigint_flag) {
+        robot_->SetJointValueTarget(joints_home);
+        robot_->MoveIt();
+
+        // FillTestPlanePlans(test_plans_, base_frame, 2., 1., 6, 3, 0.5, -1., 0.8, false);
+        // FillTestPlanePlans(test_plans_, base_frame, 2., 1., 6, 3, 0.5, -1., 1.0,  true);
+        // FillTestPlanePlans(test_plans_, base_frame, 2., 1., 6, 3, 0.5, -1., 1.2, false);
+
+        FillTestPlanePlans(test_plans_, base_frame, 1., 3., 3, 6, 1., 0., 0.8, false);
+        // FillTestPlanePlans(test_plans_, base_frame, 1., 3., 3, 6, 1., 0., 1.0,  true);
+        // FillTestPlanePlans(test_plans_, base_frame, 1., 3., 3, 6, 1., 0., 1.2, false);
 
         while (sigint_flag) {
             ExecuteTestPlans(test_plans_);
@@ -305,20 +323,24 @@ void CalibratingNode::ExecuteTestPlans(std::vector<moveit::planning_interface::M
         }
     }
 
-    robot_->SetJointValueTarget(joints_home);
-    robot_->MoveIt();
-
     ros::Duration(sleep_duration).sleep();
 
-    // Sample origin
-    tf_msg_diff_ = tf_buffer_.lookupTransform(test_frame, ros::Time(0), controller_frame, ros::Time(0), test_frame);
-    SampleSensor(controller_frame, test_frame, averaging_samples, 30, tf_msg_diff_);
-    tf_msg_sensor_ = tf_buffer_.lookupTransform(base_frame, ros::Time(0), test_frame, ros::Time(0), base_frame);
-    tf_msg_tool0_ = tf_buffer_.lookupTransform(base_frame, ros::Time(0), tool_frame, ros::Time(0), base_frame);
+    std::string pError;
+    if (tf_buffer_.canTransform(test_frame, controller_frame, ros::Time(0), &pError) &&
+        tf_buffer_.canTransform(test_frame, base_frame, ros::Time(0), &pError) )
+    {
+        // Sample origin
+        tf_msg_diff_ = tf_buffer_.lookupTransform(test_frame, ros::Time(0), controller_frame, ros::Time(0), test_frame);
+        SampleSensor(controller_frame, test_frame, averaging_samples, 30, tf_msg_diff_);
+        tf_msg_sensor_ = tf_buffer_.lookupTransform(base_frame, ros::Time(0), test_frame, ros::Time(0), base_frame);
+        tf_msg_tool0_ = tf_buffer_.lookupTransform(base_frame, ros::Time(0), tool_frame, ros::Time(0), base_frame);
 
-    bag_.write("tool0", ros::Time::now(), tf_msg_tool0_);
-    bag_.write("FK_sensor", ros::Time::now(), tf_msg_sensor_);
-    bag_.write("FK_diff", ros::Time::now(), tf_msg_diff_);
+        bag_.write("tool0", ros::Time::now(), tf_msg_tool0_);
+        bag_.write("FK_sensor", ros::Time::now(), tf_msg_sensor_);
+        bag_.write("FK_diff", ros::Time::now(), tf_msg_diff_);
+    } else {
+        ROS_WARN_STREAM(pError);
+    }
 
     bag_.close();
 }
@@ -408,9 +430,6 @@ void CalibratingNode::MeasureRobot(const int &N) {
     bag_.open("vive_calibration_" + boost::posix_time::to_simple_string(ros::Time::now().toBoost() ) + ".bag",
               rosbag::bagmode::Write);
 
-    robot_->SetJointValueTarget(joints_home);
-    robot_->MoveIt();
-
     // Preplan robot trajectories
     calibration_plans_.resize(N + 1);
     for (int i = 0; i <= N; i++) {
@@ -499,10 +518,11 @@ void CalibratingNode::MeasureRobot(const int &N) {
             ROS_WARN_STREAM("0/" << N << ": " << pError);
         }
     }
+
     robot_->SetJointValueTarget(joints_home);
     robot_->MoveIt();
 
-    ros::Duration(600.).sleep();
+    ros::Duration(sleep_duration).sleep();
 
     if (!(CalibrateViveNode() ) ) {
         ROS_ERROR("Failed solving the provided AX=XB problem");

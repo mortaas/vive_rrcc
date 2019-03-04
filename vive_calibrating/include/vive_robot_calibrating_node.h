@@ -86,6 +86,11 @@ class CalibratingNode {
     bool calibrate_flag, test_flag;
     int averaging_samples, calibration_stations;
     double sleep_duration, yaw_offset, pitch_offset, roll_offset;
+    double radius_lower_bound,              radius_upper_bound,
+           phi_position_lower_bound,        phi_position_upper_bound,
+           phi_orientation_lower_bound,     phi_orientation_upper_bound,
+           theta_position_lower_bound,      theta_position_upper_bound,
+           theta_orientation_lower_bound,   theta_orientation_upper_bound;
     std::string vr_frame,   controller_frame, test_frame,
                 base_frame, tool_frame,       world_frame;
 
@@ -100,8 +105,9 @@ class CalibratingNode {
 
     RobotInterface* robot_;
 
-    // // MoveIt!
+    // MoveIt! plans
     std::vector<moveit::planning_interface::MoveGroupInterface::Plan> calibration_plans_, test_plans_;
+    moveit::planning_interface::MoveGroupInterface::Plan plan_;
 
     // tf2
     tf2_ros::Buffer tf_buffer_;

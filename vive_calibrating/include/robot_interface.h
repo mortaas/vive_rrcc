@@ -62,6 +62,7 @@ class RobotInterface {
 
         void SetPoseTarget(const geometry_msgs::PoseStamped &pose_);
         void SetJointValueTarget(const std::vector<double> &joint_state_);
+        void SetStartStateToCurrentState();
 
         bool MoveIt();
         bool GetPlan(moveit::planning_interface::MoveGroupInterface::Plan &plan_);

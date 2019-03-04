@@ -34,13 +34,17 @@
         <param name="radius_lower_bound"            value="1.4"/>
         <param name="radius_upper_bound"            value="1.6"/>
 
-        <param name="theta_position_lower_bound"    value="$(eval 5.75 * arg('M_PI_4') )"/>
-        <param name="theta_position_upper_bound"    value="$(eval 6.25 * arg('M_PI_4') )"/>
-        <param name="phi_position_lower_bound"      value="$(eval 0.5  * arg('M_PI_4') )"/>
-        <param name="phi_position_upper_bound"      value="$(eval 0.75 * arg('M_PI_4') )"/>
+        <!-- <param name="theta_position_lower_bound"    value="$(eval 5.75 * arg('M_PI_4') )"/>
+        <param name="theta_position_upper_bound"    value="$(eval 6.25 * arg('M_PI_4') )"/> -->
+        <param name="theta_position_lower_bound"    value="$(eval -0.25 * arg('M_PI_4') )"/>
+        <param name="theta_position_upper_bound"    value="$(eval  0.25 * arg('M_PI_4') )"/>
+        <param name="phi_position_lower_bound"      value="$(eval  0.5  * arg('M_PI_4') )"/>
+        <param name="phi_position_upper_bound"      value="$(eval  0.75 * arg('M_PI_4') )"/>
 
-        <param name="theta_orientation_lower_bound" value="$(eval 5.   * arg('M_PI_4') )"/>
-        <param name="theta_orientation_upper_bound" value="$(eval 6.   * arg('M_PI_4') )"/>
+        <!-- <param name="theta_orientation_lower_bound" value="$(eval 5.   * arg('M_PI_4') )"/>
+        <param name="theta_orientation_upper_bound" value="$(eval 6.   * arg('M_PI_4') )"/> -->
+        <param name="theta_orientation_lower_bound" value="$(eval -1.  * arg('M_PI_4') )"/>
+        <param name="theta_orientation_upper_bound" value="$(eval  1.  * arg('M_PI_4') )"/>
         <param name="phi_orientation_lower_bound"   value="$(eval 1.25 * arg('M_PI_4') )"/>
         <param name="phi_orientation_upper_bound"   value="$(eval 2.75 * arg('M_PI_4') )"/>
 
@@ -61,7 +65,7 @@
         <rosparam param="test_frame">"controller_test"</rosparam>
 
         <!-- Robot joint states -->
-        <rosparam param="joints_folded">"[1.5707893454778887, -2.5900040327772613, 2.3999184786133068, -2.6179938779914945e-05, 0.799936756066561, 8.377580409572782e-05]"</rosparam>
-        <rosparam param="joints_home">"[1.5707718921853686, -1.5708155254166685, 1.5708399600261964, 0.0, 2.6179938779914945e-05, 0.0]"</rosparam>
+        <rosparam param="joints_folded">"[0.0, -2.5900040327772613, 2.3999184786133068, -2.6179938779914945e-05, 0.799936756066561, 8.377580409572782e-05]"</rosparam>
+        <rosparam param="joints_home">"[0.0, -1.5708155254166685, 1.5708399600261964, 0.0, 2.6179938779914945e-05, 0.0]"</rosparam>
     </node>
 </launch>

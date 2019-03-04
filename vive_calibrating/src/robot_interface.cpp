@@ -40,6 +40,10 @@ void RobotInterface::SetJointValueTarget(const std::vector<double> &joint_state)
     tf_msg_.transform = tf_FK_.transform;
 }
 
+void RobotInterface::SetStartStateToCurrentState() {
+    move_group_.setStartStateToCurrentState();
+}
+
 bool RobotInterface::GetPlan(moveit::planning_interface::MoveGroupInterface::Plan &plan_) {
      /**
       * Gets a MoveIt! plan from the provided joint state or pose goal.
@@ -97,7 +101,10 @@ bool RobotInterface::MoveIt() {
     tf_msg_.header.stamp = ros::Time::now();
     static_tf_broadcaster_.sendTransform(tf_msg_);
 
+    moveit::planning_interface::MoveGroupInterface::Plan plan_;
+
     ROS_INFO_STREAM("Moving to pose:" << std::endl << tf_msg_);
+    move_group_.setStartStateToCurrentState();
     if (move_group_.move() ) {
         ROS_INFO_STREAM("Trajectory execution succeeded");
 
@@ -108,4 +115,12 @@ bool RobotInterface::MoveIt() {
 
         return false;
     }
+
+    // if (GetPlan(plan_) ) {
+    //     ExecutePlan(plan_);
+        
+    //     return true;
+    // } else {
+    //     return false;
+    // }
 }
