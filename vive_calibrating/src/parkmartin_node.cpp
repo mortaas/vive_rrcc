@@ -72,9 +72,9 @@ bool ParkMartinNode::ComputeCalibration(vive_calibrating::ComputeCalibration::Re
         HoraudDornaika();
 
         // Clean up
-        n_samples = 0;
-        sophus_Ta_.clear();
-        sophus_Tb_.clear();
+        // n_samples = 0;
+        // sophus_Ta_.clear();
+        // sophus_Tb_.clear();
 
         // Respond with computed transformation
         res.success = true;

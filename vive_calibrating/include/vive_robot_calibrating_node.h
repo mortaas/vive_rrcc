@@ -80,7 +80,7 @@ class CalibratingNode {
     geometry_msgs::TransformStamped tf_msg_tool0_, tf_msg_sensor_, tf_msg_diff_;
     geometry_msgs::TransformStamped tf_msg_A_, tf_msg_B_, tf_msg_X_, tf_msg_X_inv_;
 
-    geometry_msgs::PoseStamped pose_msg_;
+    geometry_msgs::PoseStamped pose_msg_, home_pose_msg_;
 
     // Parameters
     bool calibrate_flag, test_flag;
@@ -117,7 +117,7 @@ class CalibratingNode {
     tf2::Transform tf_tool0_[2], tf_sensor_[2];
     tf2::Transform tf_X_, tf_X_inv_;
     
-    tf2::Transform tf_pose_, tf_controller_;
+    tf2::Transform tf_pose_, tf_pose_offset_, tf_controller_;
 
     bool CalibrateViveNode();
     void MeasureRobot(const int &N);
