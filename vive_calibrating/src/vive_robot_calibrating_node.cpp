@@ -65,8 +65,6 @@ bool CalibratingNode::InitParams() {
       * Returns true if all the parameters were retrieved from the server, false otherwise.
       */
 
-    joints_home = {0.0, -1.5708155254166685, 1.5708399600261964, 0.0, 2.6179938779914945e-05, 0.0};
-
     if (pvt_nh_.param<std::string>("planning_group",     planning_group,        "floor_manipulator") &&
 
         // Coordinate frames
@@ -90,9 +88,10 @@ bool CalibratingNode::InitParams() {
         pvt_nh_.getParam("theta_orientation_lower_bound", theta_orientation_lower_bound) &&
         pvt_nh_.getParam("theta_orientation_upper_bound", theta_orientation_upper_bound) &&
 
-        pvt_nh_.param("calibration_stations",            calibration_stations,  10) &&
-        pvt_nh_.param("averaging_samples",               averaging_samples,     480) &&
-        pvt_nh_.param("sleep_duration",                  sleep_duration,        600.) &&
+        pvt_nh_.param("averaging_samples",               averaging_samples,           480) &&
+        pvt_nh_.param("calibration_stations",            calibration_stations,        10) &&
+        pvt_nh_.param("calibration_sleep_duration",      calibration_sleep_duration,  600.) &&
+        pvt_nh_.param("sample_sleep_duration",           sample_sleep_duration,       600.) &&
 
         pvt_nh_.param("calibrate_flag",                  calibrate_flag,        true)  &&
         pvt_nh_.param("test_flag",                       test_flag,             false) )
@@ -173,10 +172,7 @@ bool CalibratingNode::Init() {
     tf_msg_pose_.child_frame_id = "tool0_desired";
 
     pose_msg_.header.frame_id = base_frame;
-    home_pose_msg_.header.frame_id = base_frame;
-
-    // robot_->SetJointValueTarget(joints_home);
-    // robot_->MoveIt();
+    robot_->GetCurrentPose(home_pose_msg_);
 
     if (calibrate_flag) {
         MeasureRobot(calibration_stations);
@@ -188,11 +184,7 @@ bool CalibratingNode::Init() {
         FillTestPlanePlans(test_plans_, base_frame, 1., 3., 3, 6, 1., 0., 1. ,  true);
         FillTestPlanePlans(test_plans_, base_frame, 1., 3., 3, 6, 1., 0., 1.5, false);
 
-        if (calibrate_flag) {
-            robot_->SetPoseTarget(home_pose_msg_);
-        } else {
-            robot_->SetJointValueTarget(joints_home);
-        }
+        robot_->SetPoseTarget(home_pose_msg_);
         if (robot_->GetPlan(plan_) ) {
             test_plans_.push_back(plan_);
         }
@@ -307,7 +299,7 @@ void CalibratingNode::ExecuteTestPlans(std::vector<moveit::planning_interface::M
                 break;
             }
 
-            ros::Duration(sleep_duration).sleep();
+            ros::Duration(sample_sleep_duration).sleep();
 
             std::string pError;
             if (tf_buffer_.canTransform(test_frame, controller_frame, ros::Time(0), &pError) &&
@@ -325,38 +317,8 @@ void CalibratingNode::ExecuteTestPlans(std::vector<moveit::planning_interface::M
             } else {
                 ROS_WARN_STREAM(pError);
             }
-        } else {
-            sigint_flag = true;
         }
     }
-    
-    // robot_->SetStartStateToCurrentState();
-    // if (calibrate_flag) {
-    //     robot_->SetPoseTarget(home_pose_msg_);
-    // } else {
-    //     robot_->SetJointValueTarget(joints_home);
-    // }
-    // robot_->MoveIt();
-
-    // ros::Duration(sleep_duration).sleep();
-
-    // std::string pError;
-    // if (tf_buffer_.canTransform(test_frame, controller_frame, ros::Time(0), &pError) &&
-    //     tf_buffer_.canTransform(test_frame, base_frame, ros::Time(0), &pError) )
-    // {
-    //     // Sample origin
-    //     tf_msg_diff_ = tf_buffer_.lookupTransform(test_frame, ros::Time(0), controller_frame, ros::Time(0), test_frame);
-    //     SampleSensor(controller_frame, test_frame, averaging_samples, 30, tf_msg_diff_);
-
-    //     tf_msg_sensor_ = tf_buffer_.lookupTransform(base_frame, ros::Time(0), test_frame, ros::Time(0), base_frame);
-    //     tf_msg_tool0_ = tf_buffer_.lookupTransform(base_frame, ros::Time(0), tool_frame, ros::Time(0), base_frame);
-
-    //     bag_.write("tool0", ros::Time::now(), tf_msg_tool0_);
-    //     bag_.write("FK_sensor", ros::Time::now(), tf_msg_sensor_);
-    //     bag_.write("FK_diff", ros::Time::now(), tf_msg_diff_);
-    // } else {
-    //     ROS_WARN_STREAM(pError);
-    // }
 
     bag_.close();
 }
@@ -466,7 +428,7 @@ void CalibratingNode::MeasureRobot(const int &N) {
     ROS_INFO_STREAM("0/" << N << ":");
     if (robot_->ExecutePlan(calibration_plans_[0] ) )
     {
-        ros::Duration(sleep_duration).sleep();
+        ros::Duration(sample_sleep_duration).sleep();
 
         std::string pError;
         if (tf_buffer_.canTransform(tool_frame, base_frame, ros::Time(0), &pError) &&
@@ -494,7 +456,7 @@ void CalibratingNode::MeasureRobot(const int &N) {
                 ROS_INFO_STREAM(i << "/" << N << ":");
                 if (robot_->ExecutePlan(*it_) ) {
                     // Wait for dynamics to settle down
-                    ros::Duration(sleep_duration).sleep();
+                    ros::Duration(sample_sleep_duration).sleep();
 
                     if (tf_buffer_.canTransform(base_frame, tool_frame, ros::Time(0), &pError) &&
                         tf_buffer_.canTransform(vr_frame, controller_frame, ros::Time(0), &pError) )
@@ -537,10 +499,7 @@ void CalibratingNode::MeasureRobot(const int &N) {
     }
 
     // Wait for dynamics to settle down
-    ros::Duration(sleep_duration).sleep();
-
-    robot_->SetJointValueTarget(joints_home);
-    robot_->MoveIt();
+    ros::Duration(calibration_sleep_duration).sleep();
 
     if (!(CalibrateViveNode() ) ) {
         ROS_ERROR("Failed solving the provided AX=XB problem");
@@ -556,9 +515,13 @@ void CalibratingNode::MeasureRobot(const int &N) {
 
     tf2::toMsg((tf_pose_).inverseTimes(tf_pose_offset_*tf_X_), home_pose_msg_.pose);
     home_pose_msg_.header.stamp = ros::Time::now();
+    home_pose_msg_.header.frame_id = base_frame;
 
     robot_->SetPoseTarget(home_pose_msg_);
     robot_->MoveIt();
+
+    // Wait for dynamics to settle down
+    ros::Duration(calibration_sleep_duration).sleep();
 
     if (!(CalibrateViveNode() ) ) {
         ROS_ERROR("Failed solving the provided AX=XB problem");

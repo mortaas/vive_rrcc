@@ -24,7 +24,7 @@ RobotInterface::RobotInterface(const std::string &PLANNING_GROUP,
 void RobotInterface::SetPoseTarget(const geometry_msgs::PoseStamped &pose_) {
     move_group_.setPoseTarget(pose_);
 
-    // Convert pose to transform
+    // // Convert pose to transform
     // tf2::convert(pose_.pose, tf_pose_);
     // tf2::convert(tf_pose_, tf_msg_.transform);
 }
@@ -32,11 +32,15 @@ void RobotInterface::SetPoseTarget(const geometry_msgs::PoseStamped &pose_) {
 void RobotInterface::SetJointValueTarget(const std::vector<double> &joint_state) {
     move_group_.setJointValueTarget(joint_state);
 
-    // Get joint state target as transform from FK
-    kinematic_state_->setVariablePositions(joint_names, joint_state);
-    eigen_FK_ = kinematic_state_->getGlobalLinkTransform(move_group_.getEndEffectorLink() );
-    geometry_msgs::TransformStamped tf_FK_ = tf2::eigenToTransform(eigen_FK_);
-    tf_msg_.transform = tf_FK_.transform;
+    // // Get joint state target as transform from FK
+    // kinematic_state_->setVariablePositions(joint_names, joint_state);
+    // eigen_FK_ = kinematic_state_->getGlobalLinkTransform(move_group_.getEndEffectorLink() );
+    // geometry_msgs::TransformStamped tf_FK_ = tf2::eigenToTransform(eigen_FK_);
+    // tf_msg_.transform = tf_FK_.transform;
+}
+
+void RobotInterface::GetCurrentPose(geometry_msgs::PoseStamped &pose_) {
+    pose_ = move_group_.getCurrentPose();
 }
 
 void RobotInterface::SetStartStateToCurrentState() {
@@ -98,8 +102,21 @@ bool RobotInterface::MoveIt() {
       * Returns true if trajectory execution succeeded.
       */
 
-    // Visualize desired pose as a transform in RViz
+    moveit::planning_interface::MoveGroupInterface::Plan plan_;
+    ROS_INFO_STREAM("Moving to pose:" << std::endl << tf_msg_);
+    if (GetPlan(plan_) ) {
+        if (ExecutePlan(plan_) ) {
+            ROS_INFO_STREAM("Trajectory execution succeeded");
 
+            return true;
+        }
+    } else {
+        ROS_WARN_STREAM("Trajectory execution failed");
+
+        return false;
+    }
+
+    // // Visualize desired pose as a transform in RViz
     // tf_msg_.header.stamp = ros::Time::now();
     // static_tf_broadcaster_.sendTransform(tf_msg_);
 
@@ -114,18 +131,4 @@ bool RobotInterface::MoveIt() {
 
     //     return false;
     // }
-
-    moveit::planning_interface::MoveGroupInterface::Plan plan_;
-    ROS_INFO_STREAM("Moving to pose:" << std::endl << tf_msg_);
-    if (GetPlan(plan_) ) {
-        if (ExecutePlan(plan_) ) {
-            ROS_INFO_STREAM("Trajectory execution succeeded");
-
-            return true;
-        }
-    } else {
-        ROS_WARN_STREAM("Trajectory execution failed");
-
-        return false;
-    }
 }

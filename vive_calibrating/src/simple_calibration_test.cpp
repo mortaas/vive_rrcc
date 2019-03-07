@@ -76,6 +76,8 @@ bool CalibrationTestNode::Init() {
     pose_diff_.header.frame_id = test_frame;
 
     while (!tf_buffer_.canTransform(test_frame, controller_frame, ros::Time(0) ) ) {
+        ROS_INFO("Waiting for available VIVE controller...");
+        
         ros::spinOnce();
         ros::Duration(1.0).sleep();
     }
@@ -90,12 +92,14 @@ void CalibrationTestNode::Loop() {
      * Main loop of the node
      */
 
-    tf_msg_diff_ = tf_buffer_.lookupTransform(controller_frame, test_frame, ros::Time(0) );
-    tf2::fromMsg(tf_msg_diff_.transform, tf_diff_);
-    tf2::toMsg(tf_diff_, pose_diff_.pose);
+    if (tf_buffer_.canTransform(test_frame, controller_frame, ros::Time(0) ) ) {
+        tf_msg_diff_ = tf_buffer_.lookupTransform(controller_frame, test_frame, ros::Time(0) );
+        tf2::fromMsg(tf_msg_diff_.transform, tf_diff_);
+        tf2::toMsg(tf_diff_, pose_diff_.pose);
 
-    pose_diff_.header.stamp = ros::Time::now();
-    pose_pub_.publish(pose_diff_);
+        pose_diff_.header.stamp = ros::Time::now();
+        pose_pub_.publish(pose_diff_);
+    }
 
     ros::spinOnce();
     loop_rate_.sleep();

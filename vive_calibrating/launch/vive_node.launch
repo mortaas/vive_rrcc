@@ -13,7 +13,8 @@
 
     <arg name="stations"   default="10"/>
     <arg name="samples"    default="480"/>
-    <arg name="duration"   default="600."/>
+    <arg name="cduration"   default="600."/>
+    <arg name="sduration"   default="600."/>
 
     <!-- Launch the calibration node -->
     <node name="parkmartin_node" pkg="vive_calibrating" type="parkmartin_node" output="screen" required="true"/>
@@ -26,9 +27,11 @@
         <param name="controller_frame"              value="$(arg controller)"/>
         <param name="planning_group"                value="$(arg group)"/>
 
+        <param name="calibration_sleep_duration"    value="$(arg cduration)"/>
         <param name="calibration_stations"          value="$(arg stations)"/>
         <param name="averaging_samples"             value="$(arg samples)"/>
-        <param name="sleep_duration"                value="$(arg duration)"/>
+        <param name="sample_sleep_duration"         value="$(arg sduration)"/>
+        
 
         <!-- Sphere sampling parameters for calibration -->
         <param name="radius_lower_bound"            value="1.4"/>

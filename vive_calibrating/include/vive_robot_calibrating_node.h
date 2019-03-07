@@ -13,8 +13,7 @@
 // Service msgs
 #include <vive_calibrating/AddSample.h>
 #include <vive_calibrating/ComputeCalibration.h>
-
-// Action client
+// Action msgs
 #include "vive_bridge/TrackedDevicesStamped.h"
 
 // Dynamic reconfigure
@@ -31,19 +30,10 @@
 // Eigen
 #include <Eigen/Geometry>
 #include <Eigen/SVD>
-
 // dr_eigen
 #include <average.h>
 
 // MoveIt!
-// #include <moveit/move_group_interface/move_group_interface.h>
-
-// #include <moveit/robot_model_loader/robot_model_loader.h>
-// #include <moveit/robot_model/robot_model.h>
-// #include <moveit/robot_state/robot_state.h>
-
-// #include "moveit_msgs/Constraints.h"
-
 #include "robot_interface.h"
 
 // Boost
@@ -85,17 +75,15 @@ class CalibratingNode {
     // Parameters
     bool calibrate_flag, test_flag;
     int averaging_samples, calibration_stations;
-    double sleep_duration, yaw_offset, pitch_offset, roll_offset;
+    double calibration_sleep_duration, sample_sleep_duration,
+           yaw_offset, pitch_offset, roll_offset;
     double radius_lower_bound,              radius_upper_bound,
            phi_position_lower_bound,        phi_position_upper_bound,
            phi_orientation_lower_bound,     phi_orientation_upper_bound,
            theta_position_lower_bound,      theta_position_upper_bound,
            theta_orientation_lower_bound,   theta_orientation_upper_bound;
-    std::string vr_frame,   controller_frame, test_frame,
-                base_frame, tool_frame,       world_frame;
-
-    std::vector<double> joints_home;
-    std::string planning_group;
+    std::string planning_group, vr_frame, controller_frame, test_frame,
+                base_frame, tool_frame, world_frame;
 
     bool InitParams();
 
