@@ -159,8 +159,6 @@ bool ViveInterface::PollNextEvent(int &event_type, int &device_index) {
             std::ptrdiff_t i = std::distance(fsao_, sao);
             device_index = (int) i;
 
-            VR_INFO(std::to_string(i) );
-
             switch(button_event_->event_type) {
                 case BUTTON_EVENT_BUTTON_DOWN:
                     event_type = 200; // ButtonPress
@@ -204,6 +202,8 @@ bool ViveInterface::PollNextEvent(int &event_type, int &device_index) {
                     }
                     break;
                 case BUTTON_EVENT_BUTTON_NONE:
+                    device_index = 0xFFFFFFFF;
+                    event_type = 0;
                     break;
             }
 
@@ -220,6 +220,8 @@ bool ViveInterface::PollNextEvent(int &event_type, int &device_index) {
             break;
         }
         case SurviveSimpleEventType_None:
+            device_index = 0xFFFFFFFF;
+            event_type = 0;
             break;
     }
 }
