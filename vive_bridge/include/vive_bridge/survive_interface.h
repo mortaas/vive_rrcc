@@ -34,10 +34,11 @@ class ViveInterface {
     // libsurvive
     SurviveSimpleContext *actx_;
 
-    FLT ogl_pose[16];
+    FLT pose[16];
     SurvivePose survive_pose_;
     SurviveVelocity survive_velocity_;
 
+    // Device data
     std::array<int, 8> device_classes_;
     std::array<std::string, 8> device_names_;
     std::array<std::string, 8> device_serials_;
@@ -49,7 +50,7 @@ class ViveInterface {
     ErrorMsgCallback VR_ERROR;
     FatalMsgCallback VR_FATAL;
 
-    void PollNextMessage();
+    unsigned int SurviveClassToOpenVR(const std::string &device_name);
 
     public:
         ViveInterface();
@@ -60,16 +61,15 @@ class ViveInterface {
         void Shutdown();
 
         // libsurvive
-        int SurviveClassToOpenVR(const std::string &device_name);
+        bool PollNextEvent(unsigned int &event_type, unsigned int &device_index);
+        void GetControllerState(const unsigned int &device_index, std::vector<float> &axes, std::vector<int> &buttons);
+        void TriggerHapticPulse(const unsigned int &device_index, const unsigned short &duration);
 
-        bool PoseIsValid(const int &device_index);
-        void GetControllerState(const int &device_index, std::vector<float> &axes, std::vector<int> &buttons);
-        int GetDeviceClass(const int &device_index);
-        void GetDevicePose(const int &device_index, float m[3][4]);
-        void GetDeviceSN(const int &device_index, std::string &device_sn);
-        void GetDeviceVelocity(const int &device_index, float linear[3], float angular[3]);
-        bool PollNextEvent(int &event_type, int &device_index);
-        void TriggerHapticPulse(const int &device_index, const int &axis_id, int duration);
+        bool PoseIsValid(const unsigned int &device_index);
+        unsigned int GetDeviceClass(const unsigned int &device_index);
+        void GetDevicePose(const unsigned int &device_index, float m[3][4]);
+        void GetDeviceSN(const unsigned int &device_index, std::string &device_sn);
+        void GetDeviceVelocity(const unsigned int &device_index, float linear[3], float angular[3]);
 
         // ROS logging
         void SetDebugMsgCallback(DebugMsgCallback fn);

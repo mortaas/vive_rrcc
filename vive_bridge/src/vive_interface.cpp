@@ -78,7 +78,7 @@ void ViveInterface::Shutdown() {
 std::string ViveInterface::GetStringProperty(vr::TrackedDeviceIndex_t unDeviceIndex, vr::TrackedDeviceProperty prop, vr::TrackedPropertyError *pError) {
       /**
      * Returns the static string property of a tracked device.
-     *  
+     * 
      * vr::TrackedDeviceIndex unDeviceIndex - Index of the device to get the property for.
      * vr::TrackedDeviceProperty prop - Which property to get.
      */
@@ -99,7 +99,7 @@ std::string ViveInterface::GetStringProperty(vr::TrackedDeviceIndex_t unDeviceIn
     return strValue;
 }
 
-void ViveInterface::GetControllerState(const int &device_index, std::vector<float> &axes, std::vector<int> &buttons) {
+void ViveInterface::GetControllerState(const unsigned int &device_index, std::vector<float> &axes, std::vector<int> &buttons) {
       /**
      * Get controller state and map it to axes and buttons
      */
@@ -127,7 +127,7 @@ void ViveInterface::GetControllerState(const int &device_index, std::vector<floa
     }
 }
 
-bool ViveInterface::PollNextEvent(int &event_type, int &device_index) {
+bool ViveInterface::PollNextEvent(unsigned int &event_type, unsigned int &device_index) {
       /**
      * Returns true if there is any event waiting in the event queue,
      * and also returns the event type and device index of this event.
@@ -148,7 +148,7 @@ bool ViveInterface::PollNextEvent(int &event_type, int &device_index) {
     }
 }
 
-void ViveInterface::GetDeviceSN(const int &device_index, std::string &device_sn) {
+void ViveInterface::GetDeviceSN(const unsigned int &device_index, std::string &device_sn) {
     /**
      * Get the serial number of a tracked device
      */
@@ -161,7 +161,7 @@ void ViveInterface::GetDeviceSN(const int &device_index, std::string &device_sn)
     }
 }
 
-void ViveInterface::GetDevicePose(const int &device_index, float m[3][4]) {
+void ViveInterface::GetDevicePose(const unsigned int &device_index, float m[3][4]) {
     /**
      * Get the pose of a tracked device
      * This pose is represented as the top 3 rows of a homogeneous transformation matrix
@@ -171,7 +171,7 @@ void ViveInterface::GetDevicePose(const int &device_index, float m[3][4]) {
         for (int j = 0; j < 4; j++)
             m[i][j] = device_poses_[device_index].mDeviceToAbsoluteTracking.m[i][j];
 }
-void ViveInterface::GetDeviceVelocity(const int &device_index, float linear[3], float angular[3]) {
+void ViveInterface::GetDeviceVelocity(const unsigned int &device_index, float linear[3], float angular[3]) {
     /**
      * Get the linear and angular velocity (twist) of a tracked device
      */
@@ -182,7 +182,7 @@ void ViveInterface::GetDeviceVelocity(const int &device_index, float linear[3], 
     }
 }
 
-int ViveInterface::GetDeviceClass(const int &device_index) {
+unsigned int ViveInterface::GetDeviceClass(const unsigned int &device_index) {
     /**
      * Get the class of a tracked device
      */
@@ -190,7 +190,7 @@ int ViveInterface::GetDeviceClass(const int &device_index) {
     return pHMD_->GetTrackedDeviceClass(device_index);
 }
 
-bool ViveInterface::PoseIsValid(const int &device_index) {
+bool ViveInterface::PoseIsValid(const unsigned int &device_index) {
     /**
      * Check if the pose of a tracked device is valid
      */
@@ -209,17 +209,17 @@ void ViveInterface::Update() {
     pHMD_->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseRawAndUncalibrated, 0, device_poses_, vr::k_unMaxTrackedDeviceCount);
 }
 
-void ViveInterface::TriggerHapticPulse(const int &device_index, const int &axis_id, int duration) {
+void ViveInterface::TriggerHapticPulse(const unsigned int &device_index, const unsigned short &duration) {
     /*
     * Triggers a single haptic pulse on a controller given its device index, and the pulse duration 0-3999 µs ("strength")
     */
 
     if (GetDeviceClass(device_index) == vr::TrackedDeviceClass_Controller) {
-        // 
-        duration = std::min(duration, 3999);
-        duration = std::max(duration, 0);
+        unsigned short usDurationMicroSec = duration;
+        usDurationMicroSec = std::min(usDurationMicroSec, (unsigned short) 3999);
+        usDurationMicroSec = std::max(usDurationMicroSec, (unsigned short)    0);
 
-        pHMD_->TriggerHapticPulse(device_index, axis_id, duration);
+        pHMD_->TriggerHapticPulse(device_index, 0, usDurationMicroSec);
     }
 }
 

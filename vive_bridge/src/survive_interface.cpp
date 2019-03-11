@@ -113,7 +113,7 @@ void ViveInterface::Shutdown() {
     }
 }
 
-void ViveInterface::GetControllerState(const int &device_index, std::vector<float> &axes, std::vector<int> &buttons) {
+void ViveInterface::GetControllerState(const unsigned int &device_index, std::vector<float> &axes, std::vector<int> &buttons) {
       /**
      * Get controller state and map it to axes and buttons
      */
@@ -139,7 +139,7 @@ void ViveInterface::GetControllerState(const int &device_index, std::vector<floa
     }
 }
 
-bool ViveInterface::PollNextEvent(int &event_type, int &device_index) {
+bool ViveInterface::PollNextEvent(unsigned int &event_type, unsigned int &device_index) {
       /**
      * Returns true if there is any event waiting in the event queue,
      * and also returns the event type and device index of this event.
@@ -226,7 +226,7 @@ bool ViveInterface::PollNextEvent(int &event_type, int &device_index) {
     }
 }
 
-int ViveInterface::SurviveClassToOpenVR(const std::string &device_name) {
+unsigned int ViveInterface::SurviveClassToOpenVR(const std::string &device_name) {
       /**
      * Converts libsurvive's device names to OpenVR classes
      */
@@ -251,7 +251,7 @@ int ViveInterface::SurviveClassToOpenVR(const std::string &device_name) {
     }
 }
 
-void ViveInterface::GetDeviceSN(const int &device_index, std::string &device_sn) {
+void ViveInterface::GetDeviceSN(const unsigned int &device_index, std::string &device_sn) {
     /**
      * Get the serial number of a tracked device.
      */
@@ -259,7 +259,7 @@ void ViveInterface::GetDeviceSN(const int &device_index, std::string &device_sn)
     device_sn = device_serials_[device_index];
 }
 
-void ViveInterface::GetDevicePose(const int &device_index, float m[3][4]) {
+void ViveInterface::GetDevicePose(const unsigned int &device_index, float m[3][4]) {
     /**
      * Get the pose of a tracked device
      * This pose is represented as the top 3 rows of a homogeneous transformation matrix
@@ -268,7 +268,7 @@ void ViveInterface::GetDevicePose(const int &device_index, float m[3][4]) {
     float *mptr = &device_poses_[device_index].mDeviceToAbsoluteTracking.m[0][0];
     std::copy(mptr, mptr + 16, &m[0][0]);
 }
-void ViveInterface::GetDeviceVelocity(const int &device_index, float linear[3], float angular[3]) {
+void ViveInterface::GetDeviceVelocity(const unsigned int &device_index, float linear[3], float angular[3]) {
     /**
      * Get the linear and angular velocity (twist) of a tracked device
      */
@@ -279,7 +279,7 @@ void ViveInterface::GetDeviceVelocity(const int &device_index, float linear[3], 
     }
 }
 
-int ViveInterface::GetDeviceClass(const int &device_index) {
+unsigned int ViveInterface::GetDeviceClass(const unsigned int &device_index) {
     /**
      * Get the class of a tracked device
      */
@@ -287,7 +287,7 @@ int ViveInterface::GetDeviceClass(const int &device_index) {
     return device_classes_[device_index];
 }
 
-bool ViveInterface::PoseIsValid(const int &device_index) {
+bool ViveInterface::PoseIsValid(const unsigned int &device_index) {
     /**
      * Check if the pose of a tracked device is valid
      */
@@ -316,15 +316,20 @@ void ViveInterface::Update() {
             survive_simple_object_get_latest_pose(it_, &survive_pose_);
             survive_simple_object_get_latest_velocity(it_, &survive_velocity_);
 
-            PoseToMatrix(ogl_pose, &survive_pose_);
-            std::copy(ogl_pose, ogl_pose + 16, &device_poses_[i].mDeviceToAbsoluteTracking.m[0][0]);
-            std::copy(survive_velocity_.Pos, survive_velocity_.Pos + 3, &device_poses_[i].vVelocity.v[0]);
-            std::copy(survive_velocity_.AxisAngleRot, survive_velocity_.AxisAngleRot + 3, &device_poses_[i].vAngularVelocity.v[0]);
+            // Convert pose to OpenGL matrix
+            PoseToMatrix(pose, &survive_pose_);
+
+            std::copy(pose, pose + 16,
+                      &device_poses_[i].mDeviceToAbsoluteTracking.m[0][0]);
+            std::copy(survive_velocity_.Pos, survive_velocity_.Pos + 3,
+                      &device_poses_[i].vVelocity.v[0]);
+            std::copy(survive_velocity_.AxisAngleRot, survive_velocity_.AxisAngleRot + 3,
+                      &device_poses_[i].vAngularVelocity.v[0]);
         }
     }
 }
 
-void ViveInterface::TriggerHapticPulse(const int &device_index, const int &axis_id, int duration) {
+void ViveInterface::TriggerHapticPulse(const unsigned int &device_index, const unsigned short &duration) {
     /*
     * Triggers a single haptic pulse on a controller given its device index, and the pulse duration 0-3999 µs ("strength")
     */

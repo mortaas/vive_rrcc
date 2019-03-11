@@ -29,7 +29,7 @@ ViveNode::ViveNode(int frequency)
     joy_feedback_sub_ = pvt_nh_.subscribe("joy/haptic_feedback", 10, &ViveNode::HapticFeedbackCallback, this);
 }
 
-int ViveNode::FindEmulatedNumpadState(float x, float y) {
+unsigned char ViveNode::FindEmulatedNumpadState(const float &x, const float &y) {
      /**
       * Find the D-pad state of a controller given it's x and y touch coordinates.
       * The D-pad states corresponds to numpad keys, i.e. up is 8, right is 6, down-left is 1 and so on.
@@ -70,7 +70,7 @@ void ViveNode::HapticFeedbackCallback(const sensor_msgs::JoyFeedback &msg_) {
     if (msg_.type == msg_.TYPE_RUMBLE) {
         // Check if device is a controller
         if (devices_msg_.device_classes[msg_.id] == devices_msg_.CONTROLLER) {
-            vr_.TriggerHapticPulse(msg_.id, 0, msg_.intensity);
+            vr_.TriggerHapticPulse(msg_.id, msg_.intensity);
         }
     }
 }
@@ -103,47 +103,46 @@ bool ViveNode::PublishMeshes() {
       * Publish meshes of tracked devices to visualize them as a MarkerArray in RViz
       */
     
-    visual_tools_->resetMarkerCounts();
+    rviz_tools_->resetMarkerCounts();
 
     for (int i = 0; i < devices_msg_.device_count; i++) {
-        visual_tools_->setBaseFrame(devices_msg_.device_frames[i]);
+        rviz_tools_->setBaseFrame(devices_msg_.device_frames[i]);
 
         switch (devices_msg_.device_classes[i]) {
             case vr::TrackedDeviceClass_Invalid:
                 break;
             case vr::TrackedDeviceClass_HMD:
-                visual_tools_->publishMesh(Eigen::Affine3d::Identity(),
-                                           hmd_mesh_path,
-                                           rviz_visual_tools::WHITE,
-                                           1,
-                                           devices_msg_.device_frames[i]);
+                rviz_tools_->publishMesh(Eigen::Affine3d::Identity(),
+                                         hmd_mesh_path,
+                                         rviz_visual_tools::WHITE,
+                                         1,
+                                         devices_msg_.device_frames[i]);
                 break;
             case vr::TrackedDeviceClass_Controller:
-                visual_tools_->publishMesh(Eigen::Affine3d::Identity(),
-                                           controller_mesh_path,
-                                           rviz_visual_tools::WHITE,
-                                           1,
-                                           devices_msg_.device_frames[i]);
+                rviz_tools_->publishMesh(Eigen::Affine3d::Identity(),
+                                         controller_mesh_path,
+                                         rviz_visual_tools::WHITE,
+                                         1,
+                                         devices_msg_.device_frames[i]);
                 break;
             case vr::TrackedDeviceClass_GenericTracker:
-                visual_tools_->publishMesh(Eigen::Affine3d::Identity(),
-                                           tracker_mesh_path,
-                                           rviz_visual_tools::BLACK,
-                                           1,
-                                           devices_msg_.device_frames[i]);
+                rviz_tools_->publishMesh(Eigen::Affine3d::Identity(),
+                                         tracker_mesh_path,
+                                         rviz_visual_tools::BLACK,
+                                         1,
+                                         devices_msg_.device_frames[i]);
                 break;
             case vr::TrackedDeviceClass_TrackingReference:
-                visual_tools_->publishMesh(Eigen::Affine3d::Identity(),
-                                           lighthouse_mesh_path,
-                                           rviz_visual_tools::WHITE,
-                                           1,
-                                           devices_msg_.device_frames[i]);
+                rviz_tools_->publishMesh(Eigen::Affine3d::Identity(),
+                                         lighthouse_mesh_path,
+                                         rviz_visual_tools::WHITE,
+                                         1,
+                                         devices_msg_.device_frames[i]);
                 break;
         }
     }
 
-    visual_tools_->trigger();
-
+    rviz_tools_->trigger();
     return true;
 }
 
@@ -157,13 +156,13 @@ bool ViveNode::InitParams() {
       */
     
     return (pvt_nh_.param<std::string>("hmd_mesh_path",           hmd_mesh_path,
-                                   "package://vive_bridge/meshes/vr_hmd_vive_2_0/vr_hmd_vive_2_0.dae")               &&
+                                       "package://vive_bridge/meshes/vr_hmd_vive_2_0/vr_hmd_vive_2_0.dae")               &&
             pvt_nh_.param<std::string>("controller_mesh_path",    controller_mesh_path,
-                                   "package://vive_bridge/meshes/vr_controller_vive_1_5/vr_controller_vive_1_5.dae") &&
+                                       "package://vive_bridge/meshes/vr_controller_vive_1_5/vr_controller_vive_1_5.dae") &&
             pvt_nh_.param<std::string>("tracker_mesh_path",       tracker_mesh_path,
-                                   "package://vive_bridge/meshes/TRACKER-3D.dae")                                    &&
+                                       "package://vive_bridge/meshes/TRACKER-3D.dae")                                    &&
             pvt_nh_.param<std::string>("lighthouse_mesh_path",    lighthouse_mesh_path,
-                                   "package://vive_bridge/meshes/lh_basestation_vive/lh_basestation_vive.dae")       &&
+                                       "package://vive_bridge/meshes/lh_basestation_vive/lh_basestation_vive.dae")       &&
             
             pvt_nh_.param<std::string>("world_frame", world_frame,       "root")     &&
             pvt_nh_.param<std::string>("vr_frame",    vr_frame,          "world_vr") );
@@ -232,7 +231,7 @@ void ViveNode::UpdateTrackedDevices() {
     devices_msg_.device_count = 0;
 
     // Loop through all possible device slots (indices)
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < MAX_TRACKED_DEVICES; i++) {
         devices_msg_.device_classes[i] = vr_.GetDeviceClass(i);
 
         if (devices_msg_.device_classes[i] != vr::TrackedDeviceClass_Invalid) {
@@ -291,10 +290,10 @@ bool ViveNode::Init(int argc, char **argv) {
         reconf_server_.setCallback(callback_type_);
 
         // Initialize rviz_visual_tools for publishing tracked device meshes to RViz
-        visual_tools_.reset(new rviz_visual_tools::RvizVisualTools(world_frame, "rviz_mesh_markers") );
-        visual_tools_->loadMarkerPub(false, true);
-        visual_tools_->enableFrameLocking();
-        visual_tools_->setLifetime(0);
+        rviz_tools_.reset(new rviz_visual_tools::RvizVisualTools(world_frame, "rviz_mesh_markers") );
+        rviz_tools_->loadMarkerPub(false, true);
+        rviz_tools_->enableFrameLocking();
+        rviz_tools_->setLifetime(0);
 
         // Corrective transform to make the VIVE trackers follow the 
         // coordinate system conventions of the other VIVE devices
@@ -304,7 +303,7 @@ bool ViveNode::Init(int argc, char **argv) {
         tf_tracker_.setRotation(rotation_tracker_);
 
         // Initialize data for tracked devices
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < MAX_TRACKED_DEVICES; i++) {
             TrackedDevices[i].serial_number = "";
             TrackedDevices[i].button_touched = false;
             TrackedDevices[i].controller_interaction = false;
@@ -317,8 +316,8 @@ bool ViveNode::Init(int argc, char **argv) {
         transform_msg_.header.frame_id = vr_frame;
         
         // Update and publish info about tracked devices
-        devices_msg_.device_classes.resize(8);
-        devices_msg_.device_frames.resize(8);
+        devices_msg_.device_classes.resize(MAX_TRACKED_DEVICES);
+        devices_msg_.device_frames.resize(MAX_TRACKED_DEVICES);
 
         vr_.Update();
         UpdateTrackedDevices();
@@ -403,7 +402,7 @@ void ViveNode::Loop() {
     }
 
     // Loop through all tracked devices (indices)
-    for (int i = 0; i < devices_msg_.device_count; i++) {
+    for (unsigned char i = 0; i < devices_msg_.device_count; i++) {
         // Every device with something other than TrackedDevice_Invalid is associated with a physical device
         if (devices_msg_.device_classes[i] != vr::TrackedDeviceClass_Invalid) {
             if (vr_.PoseIsValid(i) ) {
