@@ -187,6 +187,10 @@ add_executable(simple_calibration_test src/simple_calibration_test.cpp)
 target_link_libraries(simple_calibrating_node
   ${catkin_LIBRARIES}
 )
+target_link_libraries(simple_calibration_test
+  ${catkin_LIBRARIES}
+)
+
 target_link_libraries(manual_calibrating_node
   ${catkin_LIBRARIES}
 )
@@ -197,9 +201,6 @@ target_link_libraries(vive_robot_calibrating_node
 target_link_libraries(parkmartin_node
   ${catkin_LIBRARIES}
   ${CERES_LIBRARIES}
-)
-target_link_libraries(simple_calibration_test
-  ${catkin_LIBRARIES}
 )
 
 #############

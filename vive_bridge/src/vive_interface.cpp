@@ -182,7 +182,7 @@ void ViveInterface::GetDeviceVelocity(const unsigned int &device_index, float li
     }
 }
 
-unsigned int ViveInterface::GetDeviceClass(const unsigned int &device_index) {
+unsigned char ViveInterface::GetDeviceClass(const unsigned int &device_index) {
     /**
      * Get the class of a tracked device
      */

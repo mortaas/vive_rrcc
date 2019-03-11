@@ -43,12 +43,13 @@ class ViveInterface {
         void Update();
         void Shutdown();
 
+        // OpenVR
         bool PollNextEvent(unsigned int &event_type, unsigned int &device_index);
         void GetControllerState(const unsigned int &device_index, std::vector<float> &axes, std::vector<int> &buttons);
         void TriggerHapticPulse(const unsigned int &device_index, const unsigned short &duration);
 
         bool PoseIsValid(const unsigned int &device_index);
-        unsigned int GetDeviceClass(const unsigned int &device_index);
+        unsigned char GetDeviceClass(const unsigned int &device_index);
         void GetDevicePose(const unsigned int &device_index, float m[3][4]);
         void GetDeviceSN(const unsigned int &device_index, std::string &device_sn);
         void GetDeviceVelocity(const unsigned int &device_index, float linear[3], float angular[3]);
