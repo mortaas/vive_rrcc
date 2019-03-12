@@ -62,6 +62,25 @@ unsigned char ViveNode::FindEmulatedNumpadState(const float &x, const float &y) 
     }
 }
 
+bool ViveNode::TrackedDeviceIsChanged(const unsigned int &event_type) {
+     /**
+      * Returns true if there are changes to the state of a tracked device
+      */
+    
+    return (event_type == vr::VREvent_TrackedDeviceActivated ||
+            event_type == vr::VREvent_TrackedDeviceDeactivated ||
+            event_type == vr::VREvent_TrackedDeviceUpdated);
+}
+
+bool ViveNode::EventIsAvailable(unsigned int &event_type, unsigned int &device_index) {
+     /**
+      * Returns true if there is an event available in the event queue
+      */
+    
+    return (event_type != vr::VREvent_None &&
+            event_device_index != vr::k_unTrackedDeviceIndexInvalid);
+}
+
 void ViveNode::HapticFeedbackCallback(const sensor_msgs::JoyFeedback &msg_) {
      /**
       * Callback for triggering haptic feedback on a VIVE controller
@@ -369,17 +388,12 @@ void ViveNode::Loop() {
         TrackedDevices[i].controller_interaction = false || TrackedDevices[i].button_touched;
     }
 
-    if (event_type != vr::VREvent_None &&
-        event_device_index != vr::k_unTrackedDeviceIndexInvalid)
+    if (EventIsAvailable(event_type, event_device_index) )
     {
-        // Update and publish info about tracked devices if there are changes
-        if (event_type == vr::VREvent_TrackedDeviceActivated ||
-            event_type == vr::VREvent_TrackedDeviceDeactivated ||
-            event_type == vr::VREvent_TrackedDeviceUpdated)
+        // Update info about tracked devices if there are changes
+        if (TrackedDeviceIsChanged(event_type) )
         {
             UpdateTrackedDevices();
-            PublishTrackedDevices();
-            PublishMeshes();
         }
 
         // Handle controller events
@@ -493,6 +507,16 @@ void ViveNode::Loop() {
         }
     }
 
+    if (EventIsAvailable(event_type, event_device_index) )
+    {
+        // Publish info about tracked devices if there are changes
+        if (TrackedDeviceIsChanged(event_type) )
+        {
+            PublishTrackedDevices();
+            PublishMeshes();
+        }
+    }
+
     ros::spinOnce();
     loop_rate_.sleep();
 }
@@ -507,7 +531,13 @@ int main(int argc, char** argv) {
 
     if (!node_.Init(argc, argv) ) {
         node_.Shutdown();
-        exit(EXIT_FAILURE);
+
+        // Handle sigint
+        if (sigint_flag) {
+            exit(EXIT_SUCCESS);
+        } else {
+            exit(EXIT_FAILURE);
+        }
     }
 
     while (ros::ok() && sigint_flag) {

@@ -137,6 +137,8 @@ class ViveNode {
     void PublishTrackedDevices();
 
     unsigned char FindEmulatedNumpadState(const float &x, const float &y);
+    bool TrackedDeviceIsChanged(const unsigned int &event_type);
+    bool EventIsAvailable(unsigned int &event_type, unsigned int &device_index);
     
     public:
         ViveNode(int frequency);

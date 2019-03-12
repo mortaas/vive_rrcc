@@ -3,6 +3,9 @@
 <launch>
     <arg name="cmd" default="" />
 
+    <arg name="world_frame"   default="root"/>
+    <arg name="vr_frame"      default="world_vr"/>
+
     <!-- Load dynamic reconfigure parameters -->
     <!-- <node name="vive_dynparam" pkg="dynamic_reconfigure" type="dynparam" args="load vive_node $(find vive_bridge)/cfg/dynparam.yaml"/> -->
 
@@ -15,7 +18,7 @@
         <rosparam param="lighthouse_mesh_path">"package://vive_bridge/meshes/lh_basestation_vive/lh_basestation_vive.dae"</rosparam>
 
         <!-- Offset transformation parameters -->
-        <rosparam param="world_frame">"root"</rosparam>
-        <rosparam param="vr_frame">"world_vr"</rosparam>
+        <param name="world_frame" value="$(arg world_frame)" />
+        <param name="vr_frame" value="$(arg vr_frame)" />
     </node>
 </launch>

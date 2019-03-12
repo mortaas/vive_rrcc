@@ -25,10 +25,15 @@ It is also possible to visualize the tracked devices by using a MarkerArray disp
 * tracker_mesh_path
 * lighthouse_mesh_path
 
-The tracked devices are then visualized by adding ```/vive_node/rviz_mesh_markers``` as *Marker Topic* in a MarkerArray display.
-
 *The mesh files has to be supported by RViz, i.e. .stl, .mesh (Ogre) or .dae (COLLADA).*
 
+The tracked devices are then visualized by adding ```/vive_node/rviz_mesh_markers``` as *Marker Topic* in a MarkerArray display.
+
+The following warning message is normal when starting the node:
+```
+[ WARN] [1552396105.439729800]: Topic '/vive_node/rviz_mesh_markers' unable to connect to any subscribers within 0.5 sec. It is possible initially published visual messages will be lost.
+```
+*It just indicates that no nodes received the mesh markers that are published when the vive node starts.*
 
 ## Requirements
 

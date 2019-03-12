@@ -4,6 +4,7 @@
 #include <ros/ros.h>
 // ROS msgs
 #include <vive_bridge/TrackedDevicesStamped.h>
+#include <sensor_msgs/JoyFeedback.h>
 
 // MoveIt!
 #include <moveit_msgs/ApplyPlanningScene.h>
@@ -36,6 +37,9 @@ class SceneNode {
     ros::NodeHandle nh_;
     ros::Rate loop_rate_;
 
+    // Publishers
+    ros::Publisher joy_feedback_pub_;
+
     // Subscribers
     ros::Subscriber devices_sub_;
     ros::Subscriber joy_sub_;
@@ -45,6 +49,7 @@ class SceneNode {
 
     // ROS msgs
     geometry_msgs::TransformStamped tf_msg_;
+    sensor_msgs::JoyFeedback joy_feedback_msg_;
 
     // ros::ServiceClient planning_scene_client_;
     // moveit_msgs::ApplyPlanningScene planning_scene_srv_;
@@ -64,10 +69,10 @@ class SceneNode {
 
     // Eigen
     Eigen::Vector3d points_[8], basis_[4];
-    Eigen::Affine3d eigen_pose_, eigen_controller_offset_; //, eigen_eurobox_center_;
+    Eigen::Affine3d eigen_msg_, eigen_pose_, eigen_controller_offset_; //, eigen_eurobox_center_;
     
     int state;
-    double height;
+    double colinearity, height;
 
     public:
         SceneNode(int frequency);
@@ -97,29 +102,31 @@ SceneNode::SceneNode(int frequency)
     : loop_rate_(frequency),
     tf_listener_(new tf2_ros::TransformListener(tf_buffer_) )
 {
+    // Publishers
+    joy_feedback_pub_ = nh_.advertise<vive_bridge::TrackedDevicesStamped>("/vive_node/tracked_devices", 10, true);
     // Subscribers
     devices_sub_ = nh_.subscribe("/vive_node/tracked_devices", 1, &SceneNode::DevicesCb, this);
 
     // planning_scene_client_ = nh_.serviceClient<moveit_msgs::ApplyPlanningScene>("apply_planning_scene");
     // planning_scene_client_.waitForExistence();
 
-    rviz_tools_.reset(new rviz_visual_tools::RvizVisualTools("world", "/rviz_visual_markers") );
+    rviz_tools_.reset(new rviz_visual_tools::RvizVisualTools(world_frame, "/rviz_visual_markers") );
 
     // SDFormat
     // sdf_root_ = sdf_->Root();
 
-    double angle_offset = -std::atan((0.027553 - 0.00985)/(0.025907 + 0.002273) );
-
-    eigen_controller_offset_.rotate(Eigen::Quaterniond(0., 0., 1., 0.) *
-                                    Eigen::Quaterniond(std::sin(angle_offset/2), 0., 0., std::cos(angle_offset/2) ) );
-    eigen_controller_offset_.translate(Eigen::Vector3d(0., -0.036594, 0.00955) );
+    joy_feedback_msg_.type = joy_feedback_msg_.TYPE_RUMBLE;
+    joy_feedback_msg_.id = 0;
+    joy_feedback_msg_.intensity = 3999;
 
     // Eigen
-    // point1.setZero();
-    // point2.setZero();
-    // point3.setZero();
+    double angle_offset = -std::atan((0.027553 - 0.00985)/(0.025907 + 0.002273) );
 
-    // eigen_eurobox_center_.matrix().setIdentity();
+    eigen_controller_offset_.setIdentity();
+    eigen_controller_offset_.translate(Eigen::Vector3d(0., -0.025907, -0.027553) );
+    eigen_controller_offset_.rotate(Eigen::Quaterniond(0., 0., 1., 0.) *
+                                    Eigen::Quaterniond(std::sin(angle_offset/2), 0., 0., std::cos(angle_offset/2) ) );
+
     // eigen_eurobox_center_.matrix().block<3, 1>(0, 3) = Eigen::Vector3d(-0.189224, -0.139224, -0.074999);
 
     state = 0;
@@ -131,6 +138,10 @@ void SceneNode::JoyCb(const sensor_msgs::Joy& msg_) {
       /**
      * Handle VIVE Controller inputs
      */
+
+    // if (msg_.buttons[3]) {
+    //     joy_feedback_pub_.publish(joy_feedback_msg_);
+    // }
 
     if (msg_.buttons[1]) {
         switch (state) {
@@ -199,12 +210,18 @@ bool SceneNode::Init() {
 
     nh_.param<std::string>("/vive_node/world_frame", world_frame, "root");
 
-    while (controller_frame.empty() ) {
+    while (controller_frame.empty() && sigint_flag) {
         ROS_INFO("Waiting for controller...");
         
         ros::spinOnce();
         ros::Duration(5.0).sleep();
     }
+
+    // Handle sigint
+    if (!sigint_flag) {
+        return false;
+    }
+
     ROS_INFO_STREAM("Using " + controller_frame + " for calibration");
 
     joy_sub_ = nh_.subscribe("/vive_node/joy/" + controller_frame, 1, &SceneNode::JoyCb, this);
@@ -221,7 +238,7 @@ bool SceneNode::Init() {
 
     // planning_scene_.is_diff = true;
 
-    rviz_tools_->setLifetime(0.1);
+    rviz_tools_->setLifetime(3./60.);
     rviz_tools_->setBaseFrame(world_frame);
     
     return true;
@@ -229,34 +246,41 @@ bool SceneNode::Init() {
 
 void SceneNode::Loop() {
     tf_msg_ = tf_buffer_.lookupTransform(world_frame, controller_frame, ros::Time(0) );
+    eigen_msg_ = tf2::transformToEigen(tf_msg_) * eigen_controller_offset_;
 
     switch (state) {
         case 0:
-            points_[0](0, 0) = tf_msg_.transform.translation.x;
-            points_[0](1, 0) = tf_msg_.transform.translation.y;
-            points_[0](2, 0) = tf_msg_.transform.translation.z;
+            points_[0] = eigen_msg_.translation();
 
             rviz_tools_->resetMarkerCounts();
-            rviz_tools_->publishSphere(points_[0], rviz_visual_tools::BLUE, rviz_visual_tools::MEDIUM);
+            rviz_tools_->publishSphere(points_[0], rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
             rviz_tools_->trigger();
             break;
         case 1:
-            points_[1](0, 0) = tf_msg_.transform.translation.x;
-            points_[1](1, 0) = tf_msg_.transform.translation.y;
-            points_[1](2, 0) = tf_msg_.transform.translation.z;
+            points_[1] = eigen_msg_.translation();
 
             rviz_tools_->resetMarkerCounts();
-            rviz_tools_->publishSphere(points_[0], rviz_visual_tools::BLUE, rviz_visual_tools::MEDIUM);
-            rviz_tools_->publishSphere(points_[1], rviz_visual_tools::BLUE, rviz_visual_tools::MEDIUM);
-            rviz_tools_->publishLine(points_[0], points_[1], rviz_visual_tools::BLUE, rviz_visual_tools::MEDIUM);
+            rviz_tools_->publishSphere(points_[0], rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
+            rviz_tools_->publishSphere(points_[1], rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
+            rviz_tools_->publishLine(points_[0], points_[1], rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
             rviz_tools_->trigger();
             break;
         case 2:
-            points_[2](0, 0) = tf_msg_.transform.translation.x;
-            points_[2](1, 0) = tf_msg_.transform.translation.y;
-            points_[2](2, 0) = tf_msg_.transform.translation.z;
-
+            points_[2] = eigen_msg_.translation();
             basis_[1] = points_[2] - points_[0];
+
+            rviz_tools_->resetMarkerCounts();
+            rviz_tools_->publishSphere(points_[0], rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
+            rviz_tools_->publishSphere(points_[1], rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
+            rviz_tools_->publishSphere(points_[2], rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
+
+            // Check colinearity
+            colinearity = basis_[0].dot(basis_[1]) / (basis_[0].norm() * basis_[1].norm() );
+
+            if (std::abs(colinearity) > 0.5) {
+                basis_[1] = points_[2] - points_[1];
+            }
+
             basis_[2] = basis_[0].cross(basis_[1]);
 
             eigen_pose_.matrix().block<3, 1>(0, 0) = basis_[0] / basis_[0].norm();
@@ -264,34 +288,32 @@ void SceneNode::Loop() {
             eigen_pose_.matrix().block<3, 1>(0, 2) = basis_[2] / basis_[2].norm();
             eigen_pose_.matrix().block<3, 1>(0, 3) = points_[0] + 0.5*(basis_[0] + basis_[1]);
 
-            rviz_tools_->resetMarkerCounts();
-            rviz_tools_->publishSphere(points_[0], rviz_visual_tools::BLUE, rviz_visual_tools::MEDIUM);
-            rviz_tools_->publishSphere(points_[1], rviz_visual_tools::BLUE, rviz_visual_tools::MEDIUM);
-            rviz_tools_->publishSphere(points_[2], rviz_visual_tools::BLUE, rviz_visual_tools::MEDIUM);
+            rviz_tools_->publishLine(points_[0], points_[1], rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
+            rviz_tools_->publishLine(points_[0], points_[2], rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
+
             rviz_tools_->publishCuboid(eigen_pose_, basis_[0].norm(), basis_[1].norm(), 0.01);
+
             rviz_tools_->trigger();
         case 3:
-            points_[3](0, 0) = tf_msg_.transform.translation.x;
-            points_[3](1, 0) = tf_msg_.transform.translation.y;
-            points_[3](2, 0) = tf_msg_.transform.translation.z;
+            points_[3] = eigen_msg_.translation();
 
             height = (points_[3] - points_[0]).dot(basis_[2] / basis_[2].norm() );
             eigen_pose_.matrix().block<3, 1>(0, 3) = points_[0] + 0.5*(basis_[0] + basis_[1] + basis_[2] / basis_[2].norm() * height);
 
             rviz_tools_->resetMarkerCounts();
-            rviz_tools_->publishSphere(points_[0], rviz_visual_tools::BLUE, rviz_visual_tools::MEDIUM);
-            rviz_tools_->publishSphere(points_[1], rviz_visual_tools::BLUE, rviz_visual_tools::MEDIUM);
-            rviz_tools_->publishSphere(points_[2], rviz_visual_tools::BLUE, rviz_visual_tools::MEDIUM);
-            rviz_tools_->publishSphere(points_[3], rviz_visual_tools::BLUE, rviz_visual_tools::MEDIUM);
+            rviz_tools_->publishSphere(points_[0], rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
+            rviz_tools_->publishSphere(points_[1], rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
+            rviz_tools_->publishSphere(points_[2], rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
+            rviz_tools_->publishSphere(points_[3], rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
             rviz_tools_->publishCuboid(eigen_pose_, basis_[0].norm(), basis_[1].norm(), std::abs(height) );
             rviz_tools_->trigger();
             break;
         case 4:
             rviz_tools_->resetMarkerCounts();
-            rviz_tools_->publishSphere(points_[0], rviz_visual_tools::BLUE, rviz_visual_tools::MEDIUM);
-            rviz_tools_->publishSphere(points_[1], rviz_visual_tools::BLUE, rviz_visual_tools::MEDIUM);
-            rviz_tools_->publishSphere(points_[2], rviz_visual_tools::BLUE, rviz_visual_tools::MEDIUM);
-            rviz_tools_->publishSphere(points_[3], rviz_visual_tools::BLUE, rviz_visual_tools::MEDIUM);
+            rviz_tools_->publishSphere(points_[0], rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
+            rviz_tools_->publishSphere(points_[1], rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
+            rviz_tools_->publishSphere(points_[2], rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
+            rviz_tools_->publishSphere(points_[3], rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
             rviz_tools_->publishCuboid(eigen_pose_, basis_[0].norm(), basis_[1].norm(), std::abs(height) );
             rviz_tools_->trigger();
             break;
@@ -319,7 +341,14 @@ int main(int argc, char** argv) {
     SceneNode node_(60);
 
     if (!node_.Init() ) {
-        return 0;
+        node_.Shutdown();
+
+        // Handle sigint
+        if (sigint_flag) {
+            exit(EXIT_SUCCESS);
+        } else {
+            exit(EXIT_FAILURE);
+        }
     }
 
     while (ros::ok() && sigint_flag) {
@@ -327,5 +356,5 @@ int main(int argc, char** argv) {
     }
 
     node_.Shutdown();
-    return 0;
+    exit(EXIT_SUCCESS);
 }

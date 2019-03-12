@@ -121,7 +121,7 @@ bool CalibratingNode::Init() {
             }
 
             // Handle SIGINT
-            if (controller_frame.empty() ) {
+            if (!sigint_flag) {
                 return false;
             }
         }
@@ -651,7 +651,13 @@ int main(int argc, char** argv) {
 
     if (!node_.Init() ) {
         node_.Shutdown();
-        exit(EXIT_FAILURE);
+
+        // Handle sigint
+        if (sigint_flag) {
+            exit(EXIT_SUCCESS);
+        } else {
+            exit(EXIT_FAILURE);
+        }
     }
 
     node_.Shutdown();
