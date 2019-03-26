@@ -73,14 +73,16 @@ bool CalibrationTestNode::Init() {
 
     InitParams();
 
-    pose_diff_.header.frame_id = test_frame;
+    pose_diff_.header.frame_id = "controller_test";
 
-    while (!tf_buffer_.canTransform(test_frame, controller_frame, ros::Time(0) ) ) {
-        ROS_INFO("Waiting for available VIVE controller...");
+    // while (!tf_buffer_.canTransform(test_frame, controller_frame, ros::Time(0) ) ) {
+    //     ROS_INFO("Waiting for available VIVE controller...");
         
-        ros::spinOnce();
-        ros::Duration(1.0).sleep();
-    }
+    //     ros::spinOnce();
+    //     ros::Duration(1.0).sleep();
+    // }
+
+    controller_frame = "tracker_LHR_3B34A1AA";
 
     ROS_INFO_STREAM("Using " + controller_frame + " for test");
 

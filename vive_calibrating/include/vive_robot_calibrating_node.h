@@ -85,6 +85,8 @@ class CalibratingNode {
     std::string planning_group, vr_frame, controller_frame, test_frame,
                 base_frame, tool_frame, world_frame;
 
+    std::vector<double> joints_home;
+
     bool InitParams();
 
     // Reconfigure request for changing frame offset, e.g. changing world_vr frame w.r.t. world
@@ -125,10 +127,17 @@ class CalibratingNode {
     geometry_msgs::Pose SphereNormalPose(double r, double theta, double phi, geometry_msgs::Pose &pose_);
     geometry_msgs::Pose GenerateRandomPose(geometry_msgs::Pose &pose_);
 
+    std::vector<geometry_msgs::PoseStamped> calib_poses_, test_poses_;
+
     // Test poses
     void FillTestPlanePlans(std::vector<moveit::planning_interface::MoveGroupInterface::Plan> &plans_, std::string frame_id, 
                             double L, double W, int n, int m, double x_offset, double y_offset, double z_offset, bool reverse_order);
+    void FillTestPlanePoses(std::vector<geometry_msgs::PoseStamped> &plans_, std::string frame_id, 
+                            double L, double W, int n, int m, double x_offset, double y_offset, double z_offset, bool reverse_order);
     void ExecuteTestPlans(std::vector<moveit::planning_interface::MoveGroupInterface::Plan> &plans_);
+    void ExecuteTestPoses(std::vector<geometry_msgs::PoseStamped> &plans_);
+
+    void SleepWithTimer(const ros::Duration &duration_);
     
     public:
         CalibratingNode(int frequency);

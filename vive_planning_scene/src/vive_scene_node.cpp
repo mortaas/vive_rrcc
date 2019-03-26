@@ -344,7 +344,7 @@ int main(int argc, char** argv) {
         node_.Shutdown();
 
         // Handle sigint
-        if (sigint_flag) {
+        if (!sigint_flag) {
             exit(EXIT_SUCCESS);
         } else {
             exit(EXIT_FAILURE);
