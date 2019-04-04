@@ -171,7 +171,6 @@ add_executable(vive_robot_calibrating_node src/vive_robot_calibrating_node.cpp
                                            src/robot_interface.cpp)
 add_executable(parkmartin_node src/parkmartin_node.cpp)
 add_executable(simple_calibration_test src/simple_calibration_test.cpp)
-# add_executable(ceres_test src/test_ceres_se3.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -198,6 +197,7 @@ target_link_libraries(vive_robot_calibrating_node
   ${catkin_LIBRARIES}
   robot_interface
 )
+
 target_link_libraries(parkmartin_node
   ${catkin_LIBRARIES}
   ${CERES_LIBRARIES}

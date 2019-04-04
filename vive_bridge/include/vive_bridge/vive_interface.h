@@ -22,6 +22,7 @@ typedef boost::function<void(const std::string&)> FatalMsgCallback;
 class ViveInterface {
     // OpenVR
     vr::IVRSystem *pHMD_;
+    vr::IVRTrackedCamera *pCamera_;
     vr::VREvent_t event_;
     vr::VRControllerState_t controller_state_;
     vr::TrackedDevicePose_t device_poses_[vr::k_unMaxTrackedDeviceCount];

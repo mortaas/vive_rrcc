@@ -124,12 +124,17 @@ class ViveNode {
     float current_linvel[3], current_angvel[3];
     tf2::Vector3 tf_current_linvel_, tf_current_angvel_;
 
+    // Lighthouse position monitor
+    bool looped_once;
+    tf2::Transform tf_previous_poses_[MAX_TRACKED_DEVICES],
+                   tf_difference_poses_[MAX_TRACKED_DEVICES];
+
     // OpenVR interface
     ViveInterface vr_;
 
-    // Temporary values for handling VR events
+    // State values for handling VR events
     unsigned int event_type, event_device_index;
-    // Temporary values for keeping track of tracked devices
+    // State values for keeping track of tracked devices
     vive_bridge::TrackedDevicesStamped devices_msg_;
     TrackedDevice TrackedDevices[MAX_TRACKED_DEVICES];
 

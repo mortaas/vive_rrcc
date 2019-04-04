@@ -58,6 +58,32 @@ bool ViveInterface::Init(int argc, char **argv) {
 		return false;
 	}
 
+    // Camera interface
+    pCamera_ = INVALID_TRACKED_CAMERA_HANDLE;
+    pCamera_ = vr::VRTrackedCamera();
+
+    if (!pCamera_) {
+        VR_WARN("Camera interface initialization failed");
+    } else {
+        // Check if camera is available
+        bool bHasCamera = false;
+        vr::EVRTrackedCameraError nCameraError = pCamera_->HasCamera(vr::k_unTrackedDeviceIndex_Hmd, &bHasCamera);
+
+        if (nCameraError == vr::VRTrackedCameraError_None && bHasCamera) {
+            // Check firmware description of camera to ensure that the communication is valid
+            vr::TrackedPropertyError pError = vr::TrackedProp_UnknownProperty;
+            std::string string_prop = GetStringProperty(vr::k_unTrackedDeviceIndex_Hmd, vr::Prop_CameraFirmwareDescription_String, &pError);
+
+            if (pError != vr::TrackedProp_Success) {
+                VR_ERROR("Error occurred when getting camera firmware description from HMD: " + TrackedPropErrorStrings[pError] );
+            } else {
+                VR_INFO("Camera is available with firmware: \n" + string_prop);
+            }
+        } else {
+            VR_WARN("Camera is not available");
+        }
+    }
+
     VR_INFO("OpenVR API initialization succeeded");
     return true;
 }

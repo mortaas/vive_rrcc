@@ -22,11 +22,21 @@ ViveNode::ViveNode(int frequency)
     vr_.SetErrorMsgCallback(HandleErrorMsgs);
     vr_.SetFatalMsgCallback(HandleFatalMsgs);
 
+    PACKAGE_PATH = ros::package::getPath("vive_bridge");
+    NODE_NAME = ros::this_node::getName();
+
+    // System commands for dumping and loading dynamic reconfigure parameters
+    // Temporary workaround as there is no C++ API for dynamic reconfigure
+    cmd_dynparam_dump = "rosrun dynamic_reconfigure dynparam dump " + NODE_NAME + 
+                        " " + PACKAGE_PATH + "/cfg/dynparam.yaml";
+
     // Publisher and service for info about tracked devices
     devices_pub_ = pvt_nh_.advertise<vive_bridge::TrackedDevicesStamped>("tracked_devices", 10, true);
     devices_service_ = pvt_nh_.advertiseService("tracked_devices", &ViveNode::ReturnTrackedDevices, this);
 
     joy_feedback_sub_ = pvt_nh_.subscribe("joy/haptic_feedback", 10, &ViveNode::HapticFeedbackCallback, this);
+
+    looped_once = false;
 }
 
 unsigned char ViveNode::FindEmulatedNumpadState(const float &x, const float &y) {
@@ -287,14 +297,7 @@ bool ViveNode::Init(int argc, char **argv) {
      */
 
     if (vr_.Init(argc, argv) ) {
-        PACKAGE_PATH = ros::package::getPath("vive_bridge");
-        NODE_NAME = ros::this_node::getName();
-
-        // System commands for dumping and loading dynamic reconfigure parameters
-        // Temporary workaround as there is no C++ API for dynamic reconfigure
-        cmd_dynparam_dump = "rosrun dynamic_reconfigure dynparam dump " + NODE_NAME + 
-                            " " + PACKAGE_PATH + "/cfg/dynparam.yaml";
-
+        // Initialize parameters
         if (!InitParams() ) {
             ROS_WARN_STREAM("Failed to get parameters from the parameter server. \n" <<
                             "Using default parameters.");
@@ -476,8 +479,20 @@ void ViveNode::Loop() {
                     }
                     twist_msg_.header.stamp = ros::Time::now();
                     twist_pubs_map_[TrackedDevices[i].serial_number].publish(twist_msg_);
+                } else {
+                    // Compute difference between current and previous pose
+                    tf_difference_poses_[i] = tf_current_pose_.inverseTimes(tf_previous_poses_[i]);
+                    tf_previous_poses_[i] = tf_current_pose_;
+
+                    // Lighthouse position monitor
+                    if (tf_difference_poses_[i].getOrigin().length() >= 1e-6 && looped_once)
+                    {
+                        ROS_WARN_STREAM("[LIGHTHOUSE MONITOR] Position of " << devices_msg_.device_frames[i] <<
+                                        " has changed! \n The position of tracked devices has likely also changed.");
+                    }
                 }
 
+                // Handle controller input
                 if (TrackedDevices[i].controller_interaction) {
                     // Populate and publish joy message
                     joy_msg_.header.frame_id = devices_msg_.device_frames[i];
@@ -516,6 +531,8 @@ void ViveNode::Loop() {
             PublishMeshes();
         }
     }
+
+    looped_once = true;
 
     ros::spinOnce();
     loop_rate_.sleep();

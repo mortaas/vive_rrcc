@@ -195,11 +195,13 @@ add_library(survive_interface src/survive_interface.cpp)
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
+
+# OpenVR node
 add_executable(${PROJECT_NAME}_node 
   src/vive_node.cpp
   src/vive_interface.cpp
 )
-
+# libsurvive node
 add_executable(survive_bridge_node 
   src/vive_node.cpp
   src/survive_interface.cpp
