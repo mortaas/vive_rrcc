@@ -290,6 +290,14 @@ unsigned char ViveInterface::GetDeviceClass(const unsigned int &device_index) {
     return tracked_devices_[device_index].device_class;
 }
 
+unsigned char ViveInterface::GetControllerRole(const unsigned int &device_index) {
+    /**
+     * Get the controller role of a tracked device, e.g. left or right hand
+     */
+    
+    return 0;
+}
+
 bool ViveInterface::PoseIsValid(const unsigned int &device_index) {
     /**
      * Check if the pose of a tracked device is valid

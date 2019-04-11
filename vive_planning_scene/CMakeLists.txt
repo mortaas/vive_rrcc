@@ -9,6 +9,7 @@ add_compile_options(-std=c++11)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   roscpp
+  sophus_ros_conversions
   geometry_msgs
   moveit_msgs
   shape_msgs
@@ -29,6 +30,12 @@ find_package(Eigen3 REQUIRED)
 if(NOT EIGEN3_INCLUDE_DIRS)
   set(EIGEN3_INCLUDE_DIRS ${EIGEN3_INCLUDE_DIR})
 endif()
+
+# Sophus - C++ implementation of Lie Groups using Eigen
+## Set Sophus headers path
+set(SOPHUS "$ENV{HOME}/lib/sophus")
+set(sophus_INCLUDE_DIRS ${SOPHUS})
+find_package(Sophus 1.0.0 EXACT REQUIRED PATHS ${SOPHUS}/build NO_DEFAULT_PATH)
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -120,6 +127,11 @@ catkin_package(
 #  LIBRARIES vive_planning_scene
 #  CATKIN_DEPENDS geometry_msgs moveit_msgs roscpp shape_msgs
 #  DEPENDS system_lib
+CATKIN_DEPENDS
+  roscpp
+  eigen
+DEPENDS
+  sophus_ros_conversions
 )
 
 ###########
@@ -132,6 +144,7 @@ include_directories(
   include
   ${catkin_INCLUDE_DIRS}
   ${CERES_INCLUDE_DIRS}
+  ${sophus_INCLUDE_DIRS}
   ${SDFormat_INCLUDE_DIRS}
 )
 

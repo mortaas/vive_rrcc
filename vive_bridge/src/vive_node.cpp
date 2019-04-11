@@ -36,6 +36,28 @@ ViveNode::ViveNode(int frequency)
 
     joy_feedback_sub_ = pvt_nh_.subscribe("joy/haptic_feedback", 10, &ViveNode::HapticFeedbackCallback, this);
 
+    // Initialize rviz_visual_tools for publishing tracked device meshes to RViz
+    rviz_tools_.reset(new rviz_visual_tools::RvizVisualTools(world_frame, "rviz_mesh_markers") );
+    rviz_tools_->loadMarkerPub(false, true);
+    rviz_tools_->enableFrameLocking();
+    rviz_tools_->setLifetime(0);
+
+    // Initialize data for tracked devices
+    for (int i = 0; i < MAX_TRACKED_DEVICES; i++) {
+        TrackedDevices[i].serial_number = "";
+        TrackedDevices[i].button_touched = false;
+        TrackedDevices[i].controller_interaction = false;
+        TrackedDevices[i].numpad_state = 5;
+    }
+    
+    // Initialize message structures
+    devices_msg_.device_classes.resize(MAX_TRACKED_DEVICES);
+    devices_msg_.device_roles.resize(MAX_TRACKED_DEVICES);
+    devices_msg_.device_frames.resize(MAX_TRACKED_DEVICES);
+
+    joy_msg_.axes.resize(3);
+    joy_msg_.buttons.resize(13);
+
     looped_once = false;
 }
 
@@ -79,7 +101,8 @@ bool ViveNode::TrackedDeviceIsChanged(const unsigned int &event_type) {
     
     return (event_type == vr::VREvent_TrackedDeviceActivated ||
             event_type == vr::VREvent_TrackedDeviceDeactivated ||
-            event_type == vr::VREvent_TrackedDeviceUpdated);
+            event_type == vr::VREvent_TrackedDeviceUpdated ||
+            event_type == vr::VREvent_TrackedDeviceRoleChanged);
 }
 
 bool ViveNode::EventIsAvailable(unsigned int &event_type, unsigned int &device_index) {
@@ -99,7 +122,8 @@ void ViveNode::HapticFeedbackCallback(const sensor_msgs::JoyFeedback &msg_) {
     if (msg_.type == msg_.TYPE_RUMBLE) {
         // Check if device is a controller
         if (devices_msg_.device_classes[msg_.id] == devices_msg_.CONTROLLER) {
-            vr_.TriggerHapticPulse(msg_.id, msg_.intensity);
+            TrackedDevices[msg_.id].haptic_enabled = true;
+            TrackedDevices[msg_.id].haptic_end_time = ros::Time::now() + ros::Duration(msg_.intensity);
         }
     }
 }
@@ -118,9 +142,11 @@ bool ViveNode::ReturnTrackedDevices(vive_bridge::GetTrackedDevicesRequest &req,
     res.frame_id = vr_frame;
     res.device_count = devices_msg_.device_count;
     res.device_classes.resize(devices_msg_.device_count);
+    res.device_roles.resize(devices_msg_.device_count);
     res.device_frames.resize(devices_msg_.device_count);
     for (int i = 0; i < devices_msg_.device_count; i++) {
         res.device_classes[i] = devices_msg_.device_classes[i];
+        res.device_roles[i] = devices_msg_.device_roles[i];
         res.device_frames[i]  = devices_msg_.device_frames[i];
     }
 
@@ -151,7 +177,7 @@ bool ViveNode::PublishMeshes() {
                 rviz_tools_->publishMesh(Eigen::Affine3d::Identity(),
                                          controller_mesh_path,
                                          rviz_visual_tools::WHITE,
-                                         1,
+                                         1.0,
                                          devices_msg_.device_frames[i]);
                 break;
             case vr::TrackedDeviceClass_GenericTracker:
@@ -218,15 +244,14 @@ void ViveNode::SendOffsetTransform() {
      * to the world_vr frame (i.e. the inertial VR frame)
      */
 
-    origin_offset_.setValue(vr_x_offset,
-                            vr_y_offset,
-                            vr_z_offset);
-    tf_offset_.setOrigin(origin_offset_);
-
-    rotation_offset_.setRPY(vr_roll_offset,
+    orientation_offset_.setRPY(vr_roll_offset,
                             vr_pitch_offset,
                             vr_yaw_offset);
-    tf_offset_.setRotation(rotation_offset_);
+
+    tf_offset_.setOrigin(tf2::Vector3(vr_x_offset,
+                                      vr_y_offset,
+                                      vr_z_offset) );
+    tf_offset_.setRotation(orientation_offset_);
 
     tf2::convert(tf_offset_, vr_offset_msg_.transform);
 
@@ -262,6 +287,7 @@ void ViveNode::UpdateTrackedDevices() {
     // Loop through all possible device slots (indices)
     for (int i = 0; i < MAX_TRACKED_DEVICES; i++) {
         devices_msg_.device_classes[i] = vr_.GetDeviceClass(i);
+        devices_msg_.device_roles[i] = vr_.GetControllerRole(i);
 
         if (devices_msg_.device_classes[i] != vr::TrackedDeviceClass_Invalid) {
             devices_msg_.device_count++;
@@ -303,47 +329,20 @@ bool ViveNode::Init(int argc, char **argv) {
                             "Using default parameters.");
         }
 
-        // Offset transform message headers
+        // Update message headers
+        devices_msg_.header.frame_id = vr_frame;
+        transform_msg_.header.frame_id = vr_frame;
         vr_offset_msg_.header.frame_id = world_frame;
         vr_offset_msg_.child_frame_id = vr_frame;
+
+        // Update and publish info about tracked devices
+        vr_.Update();
+        UpdateTrackedDevices();
+        PublishTrackedDevices();
 
         // Set dynamic reconfigure callback function
         callback_type_ = boost::bind(&ViveNode::ReconfCallback, this, _1, _2);
         reconf_server_.setCallback(callback_type_);
-
-        // Initialize rviz_visual_tools for publishing tracked device meshes to RViz
-        rviz_tools_.reset(new rviz_visual_tools::RvizVisualTools(world_frame, "rviz_mesh_markers") );
-        rviz_tools_->loadMarkerPub(false, true);
-        rviz_tools_->enableFrameLocking();
-        rviz_tools_->setLifetime(0);
-
-        // Corrective transform to make the VIVE trackers follow the 
-        // coordinate system conventions of the other VIVE devices
-        origin_tracker_.setZero();
-        rotation_tracker_.setEuler(0.0, M_PI, 0.0);
-        tf_tracker_.setOrigin(origin_tracker_);
-        tf_tracker_.setRotation(rotation_tracker_);
-
-        // Initialize data for tracked devices
-        for (int i = 0; i < MAX_TRACKED_DEVICES; i++) {
-            TrackedDevices[i].serial_number = "";
-            TrackedDevices[i].button_touched = false;
-            TrackedDevices[i].controller_interaction = false;
-            TrackedDevices[i].numpad_state = 5;
-        }
-        joy_msg_.axes.resize(3);
-        joy_msg_.buttons.resize(13);
-
-        devices_msg_.header.frame_id = vr_frame;
-        transform_msg_.header.frame_id = vr_frame;
-        
-        // Update and publish info about tracked devices
-        devices_msg_.device_classes.resize(MAX_TRACKED_DEVICES);
-        devices_msg_.device_frames.resize(MAX_TRACKED_DEVICES);
-
-        vr_.Update();
-        UpdateTrackedDevices();
-        PublishTrackedDevices();
 
         return true;
     }
@@ -389,6 +388,13 @@ void ViveNode::Loop() {
     // Update controller interaction flags (clears flag if the buttons is not touched)
     for (int i = 0; i < devices_msg_.device_count; i++) {
         TrackedDevices[i].controller_interaction = false || TrackedDevices[i].button_touched;
+
+        // Haptic feedback
+        if (TrackedDevices[i].haptic_enabled) {
+            if (ros::Time::now() < TrackedDevices[i].haptic_end_time) {
+                vr_.TriggerHapticPulse(i, 3999);
+            }
+        }
     }
 
     if (EventIsAvailable(event_type, event_device_index) )
@@ -430,19 +436,17 @@ void ViveNode::Loop() {
                 transform_msg_.child_frame_id = devices_msg_.device_frames[i];
                 
                 ConvertTransform(current_pose, tf_current_pose_);
-                if (devices_msg_.device_classes[i] != vr::TrackedDeviceClass_GenericTracker) {
-                    tf2::convert(tf_current_pose_, transform_msg_.transform);
-                } else {
-                    // Correct pose if current device is a tracker
-                    tf2::convert(tf_current_pose_ * tf_tracker_, transform_msg_.transform);
-                }
+                tf2::convert(tf_current_pose_, transform_msg_.transform);
 
                 // Check if the pose has a valid unit quaternion
-                tf2Scalar sq_length = tf_current_pose_.getRotation().length2();
-                if (sq_length >= 0.9999 && sq_length <= 1.0001) {
-                    transform_msg_.header.stamp = ros::Time::now();
-                    tf_broadcaster_.sendTransform(transform_msg_);
-                }
+                // tf2Scalar sq_length = tf_current_pose_.getRotation().length2();
+                // if (sq_length >= 0.9999 && sq_length <= 1.0001) {
+                //     transform_msg_.header.stamp = ros::Time::now();
+                //     tf_broadcaster_.sendTransform(transform_msg_);
+                // }
+
+                transform_msg_.header.stamp = ros::Time::now();
+                tf_broadcaster_.sendTransform(transform_msg_);
 
                 // Check if current tracked device is not a lighthouse (i.e. twist is available)
                 if (devices_msg_.device_classes[i] != vr::TrackedDeviceClass_TrackingReference) {

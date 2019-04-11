@@ -49,6 +49,9 @@ struct TrackedDevice {
     // Controller user interaction
     bool button_touched;
     bool controller_interaction;
+    // Controller haptic feedback
+    bool haptic_enabled;
+    ros::Time haptic_end_time;
     // Emulated numpad state
     unsigned char numpad_state;
 };
@@ -105,13 +108,8 @@ class ViveNode {
     tf2_ros::StaticTransformBroadcaster static_tf_broadcaster_;
 
     // Transform from fixed world frame to world_vr frame (i.e. fixed VR frame)
-    tf2::Vector3 origin_offset_;
-    tf2::Quaternion rotation_offset_;
+    tf2::Quaternion orientation_offset_;
     tf2::Transform tf_offset_;
-    // Corrective transform for the tracker frames
-    tf2::Vector3 origin_tracker_;
-    tf2::Quaternion rotation_tracker_;
-    tf2::Transform tf_tracker_;
 
     void ConvertVector(const float v[3], tf2::Vector3 &tf_v_);
     void ConvertTransform(const float m[3][4], tf2::Transform &tf_m_);

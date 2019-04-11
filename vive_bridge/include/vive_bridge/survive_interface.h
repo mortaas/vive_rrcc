@@ -83,6 +83,7 @@ class ViveInterface {
         bool PoseIsValid(const unsigned int &device_index);
         unsigned char GetDeviceClass(const unsigned int &device_index);
         void GetDevicePose(const unsigned int &device_index, float m[3][4]);
+        unsigned char GetControllerRole(const unsigned int &device_index);
         void GetDeviceSN(const unsigned int &device_index, std::string &device_sn);
         void GetDeviceVelocity(const unsigned int &device_index, float linear[3], float angular[3]);
 

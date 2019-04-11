@@ -216,6 +216,14 @@ unsigned char ViveInterface::GetDeviceClass(const unsigned int &device_index) {
     return pHMD_->GetTrackedDeviceClass(device_index);
 }
 
+unsigned char ViveInterface::GetControllerRole(const unsigned int &device_index) {
+    /**
+     * Get the controller role of a tracked device, e.g. left or right hand
+     */
+    
+    return pHMD_->GetControllerRoleForTrackedDeviceIndex(device_index);
+}
+
 bool ViveInterface::PoseIsValid(const unsigned int &device_index) {
     /**
      * Check if the pose of a tracked device is valid

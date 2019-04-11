@@ -1,7 +1,29 @@
 // Ceres solver
 #include <ceres/ceres.h>
 
+
 // Ceres cost functors
+struct LineCostFunctor {
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+    LineCostFunctor(Eigen::Vector3d CentroidPoint, Eigen::Vector3d SurfacePoint) : 
+        CentroidPoint(CentroidPoint), SurfacePoint(SurfacePoint) {}
+
+    template <class T>
+    bool operator()(T const* const sAxisPoint,
+                    T* sResiduals) const
+    {
+        using Vector3T = Eigen::Matrix<T, 3, 1>;
+        Eigen::Map<Vector3T const> const AxisPoint(sAxisPoint);
+
+        sResiduals[0] = (AxisPoint - CentroidPoint.cast<T>() ).cross(CentroidPoint.cast<T>() - SurfacePoint.cast<T>() ).squaredNorm() /
+                        (AxisPoint - CentroidPoint.cast<T>() ).squaredNorm();
+
+        return true;
+    }
+
+    Eigen::Vector3d CentroidPoint, SurfacePoint;
+};
+
 struct ConeCostFunctor {
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     ConeCostFunctor(Eigen::Vector3d SurfacePoint) : SurfacePoint(SurfacePoint) {}
@@ -16,15 +38,16 @@ struct ConeCostFunctor {
         Eigen::Map<Vector3T const> const AxisPoint_a(sAxisPoint_a);
         Eigen::Map<Vector3T const> const AxisPoint_b(sAxisPoint_b);
 
-        sResiduals[0] = (AxisPoint_b - AxisPoint_a).cross(AxisPoint_a - SurfacePoint.cast<T>() ).squaredNorm() /
-                        (AxisPoint_b - AxisPoint_a).squaredNorm() -
-                        (SurfacePoint.cast<T>() - AxisPoint_b).squaredNorm() *
-                        ceres::sin(T(sAngle[0]) )*ceres::sin(T(sAngle[0]) );
+        sResiduals[0] = ((AxisPoint_b - AxisPoint_a).cross(AxisPoint_a - SurfacePoint.cast<T>() ).squaredNorm() /
+                         (AxisPoint_b - AxisPoint_a).squaredNorm() ) -
 
-                        // (SurfacePoint.cast<T>() - AxisPoint_b).dot((AxisPoint_a - AxisPoint_b) /
-                        // (AxisPoint_a - AxisPoint_b).norm() ) *
-                        // (SurfacePoint.cast<T>() - AxisPoint_b).dot((AxisPoint_a - AxisPoint_b) /
-                        // (AxisPoint_a - AxisPoint_b).norm() ) * T(ceres::tan(sAngle[0]) )*T(ceres::tan(sAngle[0]) );
+                        // (SurfacePoint.cast<T>() - AxisPoint_b).squaredNorm() *
+                        // ceres::sin(T(sAngle[0]) )*ceres::sin(T(sAngle[0]) );
+
+                        ((SurfacePoint.cast<T>() - AxisPoint_b).dot((AxisPoint_a - AxisPoint_b) /
+                         (AxisPoint_a - AxisPoint_b).norm() ) ) *
+                        ((SurfacePoint.cast<T>() - AxisPoint_b).dot((AxisPoint_a - AxisPoint_b) /
+                         (AxisPoint_a - AxisPoint_b).norm() ) ) * T(ceres::tan(sAngle[0]) )*T(ceres::tan(sAngle[0]) );
 
         return true;
     }
@@ -74,6 +97,8 @@ struct SphereCostFunctor {
 
     Eigen::Vector3d SurfacePoint;
 };
+
+
 
 
 // struct CylinderCostFunctor {

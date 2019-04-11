@@ -7,8 +7,8 @@
 #include <sensor_msgs/JoyFeedback.h>
 
 // MoveIt!
-#include <moveit_msgs/ApplyPlanningScene.h>
-#include <moveit_msgs/PlanningScene.h>
+// #include <moveit_msgs/ApplyPlanningScene.h>
+// #include <moveit_msgs/PlanningScene.h>
 
 // tf2
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
@@ -24,9 +24,15 @@
 // SDFormat
 #include <sdf/sdf.hh>
 
-// Ceres solver
+// Ceres NLS solver solver
 #include <ceres/ceres.h>
 #include "ceres_cost_functors.h"
+
+// Sophus - C++ implementation of Lie Groups using Eigen
+#include <sophus/se3.hpp>
+
+#include "sophus_ros_conversions/eigen.hpp"
+#include "sophus_ros_conversions/geometry.hpp"
 
 
 // Handle signal [ctrl + c]
@@ -76,6 +82,7 @@ class SceneNode {
     // moveit_msgs::ApplyPlanningScene planning_scene_srv_;
     // moveit_msgs::PlanningScene planning_scene_;
 
+    // RViz
     rviz_visual_tools::RvizVisualToolsPtr rviz_tools_, rviz_infinite_tools_;
 
     // SDFormat
@@ -86,7 +93,8 @@ class SceneNode {
     tf2_ros::TransformListener *tf_listener_;
 
     tf2::Transform tf_tracker_;
-    std::string controller_frame, world_frame;
+    std::string controller_frame, tool_frame, tracker_frame, world_frame;
+    unsigned int controller_id, tracker_id;
 
     // Eigen
     Eigen::Affine3d eigen_msg_, eigen_pose_, eigen_controller_offset_;
@@ -96,7 +104,7 @@ class SceneNode {
     Eigen::Vector3d eigen_a_, eigen_b_, eigen_point_;
     double angle, height, radius, scale;
 
-    int state;
+    unsigned int state;
 
     public:
         SceneNode(int frequency);
@@ -115,6 +123,11 @@ void SceneNode::DevicesCb(const vive_bridge::TrackedDevicesStamped& msg_) {
     for (int i = 0; i < msg_.device_count; i++) {
         if (msg_.device_classes[i] == msg_.CONTROLLER) {
             controller_frame = msg_.device_frames[i];
+            controller_id = i;
+        }
+        if (msg_.device_classes[i] == msg_.TRACKER) {
+            tracker_frame = msg_.device_frames[i];
+            tracker_id = i;
         }
     }
 }
@@ -125,13 +138,14 @@ SceneNode::SceneNode(int frequency)
       sdf_(new sdf::SDF() )
 {
     // Publishers
-    joy_feedback_pub_ = nh_.advertise<vive_bridge::TrackedDevicesStamped>("/vive_node/tracked_devices", 10, true);
+    joy_feedback_pub_ = nh_.advertise<sensor_msgs::JoyFeedback>("/vive_node/joy/haptic_feedback", 10, true);
     // Subscribers
     devices_sub_ = nh_.subscribe("/vive_node/tracked_devices", 1, &SceneNode::DevicesCb, this);
 
     // planning_scene_client_ = nh_.serviceClient<moveit_msgs::ApplyPlanningScene>("apply_planning_scene");
     // planning_scene_client_.waitForExistence();
 
+    // RViz
     rviz_tools_.reset(new rviz_visual_tools::RvizVisualTools(world_frame, "/rviz_visual_markers") );
     rviz_infinite_tools_.reset(new rviz_visual_tools::RvizVisualTools(world_frame, "/rviz_infinite_visual_markers") );
 
@@ -163,20 +177,18 @@ SceneNode::SceneNode(int frequency)
 
     sdf_->Write("test.sdf");
 
-    // exit(EXIT_SUCCESS);
-
+    // Define joy feedback message
     joy_feedback_msg_.type = joy_feedback_msg_.TYPE_RUMBLE;
-    joy_feedback_msg_.id = 0;
-    joy_feedback_msg_.intensity = 3999;
+    joy_feedback_msg_.intensity = .1;
 
-    // Eigen
+    // Controller offset transform (Eigen)
     double angle_offset = -std::atan((0.027553 - 0.00985)/(0.025907 + 0.002273) );
-
     eigen_controller_offset_.setIdentity();
     eigen_controller_offset_.translate(Eigen::Vector3d(0., -0.025907, -0.027553) );
     eigen_controller_offset_.rotate(Eigen::Quaterniond(0., 0., 1., 0.) *
                                     Eigen::Quaterniond(std::sin(angle_offset/2), 0., 0., std::cos(angle_offset/2) ) );
 
+    // Set default start state
     state = STATE_DEFINE_BOX_POINT;
 }
 SceneNode::~SceneNode() {
@@ -192,7 +204,11 @@ void SceneNode::JoyCb(const sensor_msgs::Joy& msg_) {
             points_.push_back(eigen_point_);
             ROS_INFO_STREAM("Point " << points_.size() << ": \n" << eigen_point_.matrix() );
 
+            // Trigger controller haptic feedback
+            joy_feedback_pub_.publish(joy_feedback_msg_);
+
             switch(state) {
+                // BOX
                 case STATE_DEFINE_BOX_HEIGHT: {
                     rviz_infinite_tools_->publishCuboid(eigen_pose_, vecs_[0].norm(), vecs_[1].norm(), std::abs(height), rviz_visual_tools::BLUE);
                     rviz_infinite_tools_->trigger();
@@ -216,6 +232,7 @@ void SceneNode::JoyCb(const sensor_msgs::Joy& msg_) {
                     state = STATE_DEFINE_BOX_LINE;
                     break;
                 }
+                // CYLINDER
                 case STATE_DEFINE_CYLINDER_TOP: {
                     eigen_b_ = vecs_[2];
 
@@ -223,7 +240,7 @@ void SceneNode::JoyCb(const sensor_msgs::Joy& msg_) {
                     rviz_infinite_tools_->trigger();
                     points_.clear();
 
-                    state = STATE_DEFINE_SPHERE;
+                    state = STATE_DEFINE_CYLINDER;
                     break;
                 }
                 case STATE_DEFINE_CYLINDER_BOTTOM: {
@@ -232,6 +249,7 @@ void SceneNode::JoyCb(const sensor_msgs::Joy& msg_) {
                     state = STATE_DEFINE_CYLINDER_TOP;
                     break;
                 }
+                // CONE
                 case STATE_DEFINE_CONE_HEIGHT: {
                     rviz_infinite_tools_->publishCone(eigen_pose_, angle, rviz_visual_tools::BLUE, scale);
                     rviz_infinite_tools_->trigger();
@@ -244,40 +262,91 @@ void SceneNode::JoyCb(const sensor_msgs::Joy& msg_) {
         }
     }
 
+    if (msg_.buttons[3]) { // Trigger button
+        joy_feedback_pub_.publish(joy_feedback_msg_);
+
+        // points_.push_back(eigen_point_);
+        // ROS_INFO_STREAM("Point " << points_.size() << ": \n" << eigen_point_.matrix() );
+    }
+
     if (msg_.buttons[2]) { // Touchpad button
+        // CONE
         if (msg_.buttons[5]) { // Touchpad down
+            // Trigger controller haptic feedback
+            joy_feedback_pub_.publish(joy_feedback_msg_);
+
             if (state != STATE_DEFINE_CONE &&
                 state != STATE_DEFINE_CONE_HEIGHT) {
                 state = STATE_DEFINE_CONE;
                 points_.clear();
             } else {
                 if (points_.size() >= 6) {
-                    // Ceres
+                    // Ceres NLS solver
                     ceres::Problem ceres_problem;
                     ceres::Solver::Options ceres_options;
                     ceres::Solver::Summary ceres_summary;
 
-                    // Seed
-                    eigen_a_ = points_[0];
-                    eigen_b_ = points_[0];
-                    eigen_a_(2) = 0;
-                    angle = M_PI_4;
+                    // Compute centroid of point set
+                    eigen_a_ = Eigen::Vector3d::Zero();
+                    eigen_b_ = Eigen::Vector3d::Zero();
+                    for (std::vector<Eigen::Vector3d>::iterator it_ = points_.begin(); it_ != points_.end(); ++it_) {
+                        eigen_b_ += *it_;
+                    }
+                    eigen_b_ /= points_.size();
 
-                    for (int i = 0; i < 7; i++) {
-                        ceres::CostFunction* cost_function =
-                            new ceres::AutoDiffCostFunction<ConeCostFunctor, 1, 3, 3, 1>
-                                                        (new ConeCostFunctor(points_[i].cast<double>() ) );
-                        ceres_problem.AddResidualBlock(cost_function, NULL, eigen_a_.data(), eigen_b_.data(), &angle);
+                    ROS_INFO_STREAM(eigen_b_);
+
+                    // Solve line NLS problem
+                    {
+                        ceres::Problem ceres_problem;
+                        ceres::Solver::Options ceres_options;
+                        ceres::Solver::Summary ceres_summary;
+
+                        for (std::vector<Eigen::Vector3d>::iterator it_ = points_.begin(); it_ != points_.end(); ++it_) {
+                            ceres::CostFunction* cost_function =
+                                new ceres::AutoDiffCostFunction<LineCostFunctor, 1, 3>
+                                                            (new LineCostFunctor(eigen_b_, *it_) );
+                            ceres_problem.AddResidualBlock(cost_function, NULL, eigen_a_.data() );
+                        }
+
+                        // Set solver options
+                        ceres_options.linear_solver_type = ceres::DENSE_SCHUR;
+                        ceres_options.minimizer_progress_to_stdout = true;
+
+                        // Solve NLS problem
+                        Solve(ceres_options, &ceres_problem, &ceres_summary);
+                        ROS_INFO_STREAM(ceres_summary.BriefReport() << std::endl);
                     }
 
-                    // Set solver ceres_options (precision / method)
-                    ceres_options.linear_solver_type = ceres::DENSE_SCHUR;
-                    ceres_options.minimizer_progress_to_stdout = true;
+                    eigen_b_ += (eigen_b_ - eigen_a_);
+                    ROS_INFO_STREAM(eigen_a_);
+                    rviz_infinite_tools_->publishLine(eigen_a_, eigen_b_, rviz_visual_tools::RED, rviz_visual_tools::XLARGE);
+                    rviz_infinite_tools_->trigger();
 
-                    // Solve
-                    Solve(ceres_options, &ceres_problem, &ceres_summary);
+                    // Solver seed
+                    angle = M_PI_4;
 
-                    ROS_INFO_STREAM(ceres_summary.FullReport() << std::endl);
+                    // Solve cone NLS problem
+                    {
+                        ceres::Problem ceres_problem;
+                        ceres::Solver::Options ceres_options;
+                        ceres::Solver::Summary ceres_summary;
+
+                        for (std::vector<Eigen::Vector3d>::iterator it_ = points_.begin(); it_ != points_.end(); ++it_) {
+                            ceres::CostFunction* cost_function =
+                                new ceres::AutoDiffCostFunction<ConeCostFunctor, 1, 3, 3, 1>
+                                                            (new ConeCostFunctor(*it_) );
+                            ceres_problem.AddResidualBlock(cost_function, NULL, eigen_a_.data(), eigen_b_.data(), &angle);
+                        }
+
+                        // Set solver options
+                        ceres_options.linear_solver_type = ceres::DENSE_SCHUR;
+                        ceres_options.minimizer_progress_to_stdout = true;
+
+                        // Solve NLS problem
+                        Solve(ceres_options, &ceres_problem, &ceres_summary);
+                        ROS_INFO_STREAM(ceres_summary.BriefReport() << std::endl);
+                    }
 
                     vecs_[0] = eigen_a_ - eigen_b_;
                     basis_[0] = vecs_[0] / vecs_[0].norm();
@@ -286,7 +355,12 @@ void SceneNode::JoyCb(const sensor_msgs::Joy& msg_) {
                 } // if (points_.size() >= 6)
             } // if (state != STATE_DEFINE_CONE)
         }
+
+        // CYLINDER
         if (msg_.buttons[7]) { // Touchpad left
+            // Trigger controller haptic feedback
+            joy_feedback_pub_.publish(joy_feedback_msg_);
+
             if (state != STATE_DEFINE_CYLINDER &&
                 state != STATE_DEFINE_CYLINDER_BOTTOM &&
                 state != STATE_DEFINE_CYLINDER_TOP) {
@@ -294,31 +368,65 @@ void SceneNode::JoyCb(const sensor_msgs::Joy& msg_) {
                 points_.clear();
             } else {
                 if (points_.size() >= 6) {
-                    // Ceres
+                    // Ceres NLS solver
                     ceres::Problem ceres_problem;
                     ceres::Solver::Options ceres_options;
                     ceres::Solver::Summary ceres_summary;
 
-                    // Seed
-                    eigen_a_ = points_[0];
-                    eigen_b_ = points_[0];
-                    eigen_a_(2) = 0;
+                    // Compute centroid of point set
+                    eigen_a_ = Eigen::Vector3d::Zero();
+                    eigen_b_ = Eigen::Vector3d::Zero();
+                    for (std::vector<Eigen::Vector3d>::iterator it_ = points_.begin(); it_ != points_.end(); ++it_) {
+                        eigen_b_ += *it_;
+                    }
+                    eigen_b_ /= points_.size();
+
+                    ROS_INFO_STREAM(eigen_b_);
+
+                    // Solve line NLS problem
+                    {
+                        ceres::Problem ceres_problem;
+                        ceres::Solver::Options ceres_options;
+                        ceres::Solver::Summary ceres_summary;
+
+                        for (std::vector<Eigen::Vector3d>::iterator it_ = points_.begin(); it_ != points_.end(); ++it_) {
+                            ceres::CostFunction* cost_function =
+                                new ceres::AutoDiffCostFunction<LineCostFunctor, 1, 3>
+                                                            (new LineCostFunctor(eigen_b_, *it_) );
+                            ceres_problem.AddResidualBlock(cost_function, NULL, eigen_a_.data() );
+                        }
+
+                        // Set solver options
+                        ceres_options.linear_solver_type = ceres::DENSE_SCHUR;
+                        ceres_options.minimizer_progress_to_stdout = true;
+
+                        // Solve NLS problem
+                        Solve(ceres_options, &ceres_problem, &ceres_summary);
+                        ROS_INFO_STREAM(ceres_summary.BriefReport() << std::endl);
+                    }
+
+                    eigen_b_ += (eigen_b_ - eigen_a_);
+                    ROS_INFO_STREAM(eigen_a_);
+                    rviz_infinite_tools_->publishLine(eigen_a_, eigen_b_, rviz_visual_tools::RED, rviz_visual_tools::XLARGE);
+                    rviz_infinite_tools_->trigger();
+
+                    // Solver seed
                     radius = 0.5;
 
-                    for (int i = 0; i < 7; i++) {
+                    // Residual blocks
+                    for (std::vector<Eigen::Vector3d>::iterator it_ = points_.begin(); it_ != points_.end(); ++it_) {
                         ceres::CostFunction* cost_function =
                             new ceres::AutoDiffCostFunction<CylinderCostFunctor, 1, 3, 3, 1>
-                                                        (new CylinderCostFunctor(points_[i].cast<double>() ) );
+                                                        (new CylinderCostFunctor(*it_) );
                         ceres_problem.AddResidualBlock(cost_function, NULL, eigen_a_.data(), eigen_b_.data(), &radius);
                     }
 
-                    // Set solver ceres_options (precision / method)
+                    // Set solver options
                     ceres_options.linear_solver_type = ceres::DENSE_SCHUR;
                     ceres_options.minimizer_progress_to_stdout = true;
 
-                    // Solve
+                    // Solve NLS problem
                     Solve(ceres_options, &ceres_problem, &ceres_summary);
-
                     ROS_INFO_STREAM(ceres_summary.FullReport() << std::endl);
 
                     vecs_[0] = eigen_b_ - eigen_a_;
@@ -328,16 +436,25 @@ void SceneNode::JoyCb(const sensor_msgs::Joy& msg_) {
                 } // if (points_.size() >= 6)
             } // if (state != STATE_DEFINE_CYLINDER)
         } // if (msg_.buttons[7])
+
+        // BOX
         if (msg_.buttons[9]) { // Touchpad right
+            // Trigger controller haptic feedback
+            joy_feedback_pub_.publish(joy_feedback_msg_);
+
             state = STATE_DEFINE_BOX_POINT;
             points_.clear();
         }
         if (msg_.buttons[11]) { // Touchpad up
+            // Trigger controller haptic feedback
+            joy_feedback_pub_.publish(joy_feedback_msg_);
+
             if (state != STATE_DEFINE_SPHERE) {
                 state = STATE_DEFINE_SPHERE;
                 points_.clear();
             } else {
                 if (points_.size() >= 4) {
+                    // Solver seed
                     Eigen::Matrix4d eigen_A_;
                     eigen_A_ << points_[0].transpose(), 1,
                                 points_[1].transpose(), 1,
@@ -350,20 +467,20 @@ void SceneNode::JoyCb(const sensor_msgs::Joy& msg_) {
                                 points_[2].squaredNorm(),
                                 points_[3].squaredNorm();
                     
-                    Eigen::Vector4d eigen_x_ = eigen_A_.colPivHouseholderQr().solve(eigen_b_);
+                    Eigen::Vector4d eigen_x_ = eigen_A_.fullPivHouseholderQr().solve(eigen_b_);
                     Eigen::Vector3d eigen_c_ = -0.5*eigen_x_.head<3>();
                     radius = 0.5*std::sqrt(eigen_c_.squaredNorm() - 4*eigen_x_(3) );
 
-                    // Ceres
+                    // Ceres NLS solver
                     ceres::Problem ceres_problem;
                     ceres::Solver::Options ceres_options;
                     ceres::Solver::Summary ceres_summary;
 
                     // Residual blocks
-                    for (int i = 0; i < points_.size(); i++) {
+                    for (std::vector<Eigen::Vector3d>::iterator it_ = points_.begin(); it_ != points_.end(); ++it_) {
                         ceres::CostFunction* cost_function =
                             new ceres::AutoDiffCostFunction<SphereCostFunctor, 1, 3, 1>
-                                                           (new SphereCostFunctor(points_[i]) );
+                                                           (new SphereCostFunctor(*it_) );
                         ceres_problem.AddResidualBlock(cost_function, NULL, eigen_c_.data(), &radius);
                     }
 
@@ -371,9 +488,8 @@ void SceneNode::JoyCb(const sensor_msgs::Joy& msg_) {
                     ceres_options.linear_solver_type = ceres::DENSE_SCHUR;
                     ceres_options.minimizer_progress_to_stdout = true;
 
-                    // Solve
+                    // Solve NLS problem
                     Solve(ceres_options, &ceres_problem, &ceres_summary);
-
                     ROS_INFO_STREAM(ceres_summary.FullReport() << std::endl);
 
                     rviz_infinite_tools_->publishSphere(eigen_c_, rviz_visual_tools::BLUE, 2*radius);
@@ -385,44 +501,6 @@ void SceneNode::JoyCb(const sensor_msgs::Joy& msg_) {
             } // if (state != STATE_DEFINE_SPHERE)
         } // if (msg_.buttons[11])
     } // if (msg_.buttons[2])
-
-    // CONE
-
-    // switch (state) {
-    //         // Seed
-    //         eigen_a_ = points_[0];
-    //         eigen_b_ = points_[6];
-    //         eigen_a_(2) = 0;
-    //         radius = M_PI_4;
-
-    //         for (int i = 0; i < 6; i++) {
-    //             ROS_INFO_STREAM(points_[i].matrix() );
-    //             ceres::CostFunction* cost_function =
-    //                 new ceres::AutoDiffCostFunction<ConeCostFunctor, 1, 3, 3, 1>
-    //                                             (new ConeCostFunctor(points_[i].cast<double>() ) );
-    //             ceres_problem.AddResidualBlock(cost_function, NULL, eigen_a_.data(), eigen_b_.data(), &radius);
-    //         }
-
-    //         // Set solver ceres_options (precision / method)
-    //         ceres_options.linear_solver_type = ceres::DENSE_SCHUR;
-    //         ceres_options.minimizer_progress_to_stdout = true;
-
-    //         // Solve
-    //         Solve(ceres_options, &ceres_problem, &ceres_summary);
-
-    //         ROS_INFO_STREAM(ceres_summary.FullReport() << std::endl);
-
-    //         ROS_INFO_STREAM(eigen_a_.matrix() );
-    //         ROS_INFO_STREAM(eigen_b_.matrix() );
-    //         ROS_INFO_STREAM(radius);
-
-    //         state = 7;
-    //         break;
-    //     case 7:
-    //         ROS_INFO("Publish!");
-    //         state = 0;
-    //         break;
-    // }
 }
 
 bool SceneNode::Init() {
@@ -432,6 +510,7 @@ bool SceneNode::Init() {
 
     nh_.param<std::string>("/vive_node/world_frame", world_frame, "root");
 
+    // Get available controller
     while (controller_frame.empty() && sigint_flag) {
         ROS_INFO("Waiting for controller...");
         
@@ -446,8 +525,10 @@ bool SceneNode::Init() {
 
     ROS_INFO_STREAM("Using " + controller_frame + " for calibration");
 
+    // Subscribe to joy topic
     joy_sub_ = nh_.subscribe("/vive_node/joy/" + controller_frame, 1, &SceneNode::JoyCb, this);
 
+    // Check if transforms are available
     std::string pError;
     if (!tf_buffer_.canTransform(controller_frame,
                                  world_frame, ros::Time(0),
@@ -456,13 +537,28 @@ bool SceneNode::Init() {
         ROS_ERROR_STREAM("Can't transform from " + world_frame + " to " + controller_frame + ": " + pError);
 
         return false;
+    } else {
+        tool_frame = controller_frame;
     }
+    if (!tracker_frame.empty() ) {
+        if (!tf_buffer_.canTransform(tracker_frame + "_tool0",
+                                     world_frame, ros::Time(0),
+                                     ros::Duration(0.), &pError) )
+        {
+            ROS_WARN_STREAM("Can't transform from " + world_frame + " to " + tracker_frame + "_tool0 : " + pError);
+        } else {
+            tool_frame = tracker_frame + "_tool0";
+        }
+    }
+
+    joy_feedback_msg_.id = controller_id;
 
     // planning_scene_.is_diff = true;
 
+    // Limited marker lifetime
     rviz_tools_->setLifetime(3./60.);
     rviz_tools_->setBaseFrame(world_frame);
-
+    // Infinite marker lifetime
     rviz_infinite_tools_->setLifetime(0.);
     rviz_infinite_tools_->setBaseFrame(world_frame);
     
@@ -471,28 +567,34 @@ bool SceneNode::Init() {
 
 void SceneNode::Loop() {
     // Get tracked device location from tf server
-    tf_msg_ = tf_buffer_.lookupTransform(world_frame, controller_frame, ros::Time(0) );
-    eigen_msg_ = tf2::transformToEigen(tf_msg_) * eigen_controller_offset_;
+    tf_msg_ = tf_buffer_.lookupTransform(world_frame, tool_frame, ros::Time(0) );
+
+    if (tool_frame == controller_frame) {
+        eigen_msg_ = tf2::transformToEigen(tf_msg_) * eigen_controller_offset_;
+    } else {
+        eigen_msg_ = tf2::transformToEigen(tf_msg_);
+    }
     eigen_point_ = eigen_msg_.translation();
 
     rviz_tools_->resetMarkerCounts();
 
-    // Publish spheres at points
+    // Publish spheres at registered points
     for (std::vector<Eigen::Vector3d>::iterator it_ = points_.begin(); it_ != points_.end(); ++it_) {
         rviz_tools_->publishSphere(*it_, rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
     }
     // Red sphere at current point
     rviz_tools_->publishSphere(eigen_point_, rviz_visual_tools::RED, rviz_visual_tools::XLARGE);
 
+    // Visualize geometry in RViz
     switch(state) {
-        // BOX STATE MACHINE
+        // BOX
         case STATE_DEFINE_BOX_LINE: {
             rviz_tools_->publishLine(points_[0], eigen_point_, rviz_visual_tools::RED, rviz_visual_tools::XLARGE);
 
             break;
         }
         case STATE_DEFINE_BOX_PLANE: {
-            // Project current point to a line defined by the two last points
+            // Project tracked device position to a line defined by the last two points
             projected_point_ = points_[0] + (eigen_point_ - points_[0]).dot(basis_[0]) * basis_[0];
             vecs_[1] = eigen_point_ - projected_point_;
             basis_[1] = vecs_[1] / vecs_[1].norm();
@@ -526,11 +628,8 @@ void SceneNode::Loop() {
 
             break;
         }
-        // case STATE_DEFINE_BOX: {
-        //     rviz_tools_->publishCuboid(eigen_pose_, vecs_[0].norm(), vecs_[1].norm(), std::abs(height), rviz_visual_tools::BLUE);
 
-        //     break;
-        // }
+        // CYLINDER
         case STATE_DEFINE_CYLINDER_BOTTOM: {
             vecs_[1] = eigen_a_ + (eigen_point_ - eigen_a_).dot(basis_[0]) * basis_[0];
 
@@ -543,6 +642,8 @@ void SceneNode::Loop() {
             rviz_tools_->publishCylinder(eigen_a_, vecs_[2], rviz_visual_tools::BLUE, 2*radius);
             break;
         }
+
+        // CONE
         case STATE_DEFINE_CONE_HEIGHT: {
             scale = (eigen_point_ - eigen_b_).dot(basis_[0]);
             vecs_[1] = eigen_b_ + scale * basis_[0];
@@ -553,7 +654,7 @@ void SceneNode::Loop() {
             eigen_pose_.matrix().block<3, 1>(0, 0) = basis_[0] / basis_[0].norm();
             eigen_pose_.matrix().block<3, 1>(0, 1) = basis_[1] / basis_[1].norm();
             eigen_pose_.matrix().block<3, 1>(0, 2) = basis_[2] / basis_[2].norm();
-            eigen_pose_.matrix().block<3, 1>(0, 3) = eigen_b_ - 0.5*scale * basis_[0];
+            eigen_pose_.matrix().block<3, 1>(0, 3) = eigen_b_; // - 0.5*scale * basis_[0];
 
             rviz_tools_->publishCone(eigen_pose_, angle, rviz_visual_tools::BLUE, scale);
             break;
@@ -561,178 +662,6 @@ void SceneNode::Loop() {
     }
 
     rviz_tools_->trigger();
-
-    // BOX STATE MACHINE
-
-    // switch (state) {
-    //     case 0:
-    //         points_[0] = eigen_msg_.translation();
-
-    //         rviz_tools_->resetMarkerCounts();
-    //         rviz_tools_->publishSphere(points_[0], rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
-    //         rviz_tools_->trigger();
-    //         break;
-    //     case 1:
-    //         points_[1] = eigen_msg_.translation();
-
-    //         rviz_tools_->resetMarkerCounts();
-    //         rviz_tools_->publishSphere(points_[0], rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
-    //         rviz_tools_->publishSphere(points_[1], rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
-    //         rviz_tools_->publishLine(points_[0], points_[1], rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
-    //         rviz_tools_->trigger();
-    //         break;
-    //     case 2:
-    //         points_[2] = eigen_msg_.translation();
-    //         basis_[0] = points_[1] - points_[0];
-    //         basis_[1] = points_[2] - points_[0];
-
-    //         rviz_tools_->resetMarkerCounts();
-    //         rviz_tools_->publishSphere(points_[0], rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
-    //         rviz_tools_->publishSphere(points_[1], rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
-    //         rviz_tools_->publishSphere(points_[2], rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
-
-    //         projected_point_ = points_[0] + basis_[1].dot(basis_[0] / basis_[0].norm() ) * basis_[0] / basis_[0].norm();
-    //         basis_[1] = points_[2] - projected_point_;
-    //         basis_[2] = basis_[0].cross(basis_[1]);
-
-    //         eigen_pose_.matrix().block<3, 1>(0, 0) = basis_[0] / basis_[0].norm();
-    //         eigen_pose_.matrix().block<3, 1>(0, 1) = basis_[1] / basis_[1].norm();
-    //         eigen_pose_.matrix().block<3, 1>(0, 2) = basis_[2] / basis_[2].norm();
-    //         eigen_pose_.matrix().block<3, 1>(0, 3) = points_[0] + 0.5*(basis_[0] + basis_[1]);
-
-    //         rviz_tools_->publishLine(points_[0], points_[1], rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
-    //         rviz_tools_->publishLine(points_[0], points_[2], rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
-
-    //         rviz_tools_->publishSphere(projected_point_, rviz_visual_tools::RED, rviz_visual_tools::XLARGE);
-    //         rviz_tools_->publishLine(points_[0], projected_point_, rviz_visual_tools::RED,  rviz_visual_tools::XLARGE);
-
-    //         rviz_tools_->publishCuboid(eigen_pose_, basis_[0].norm(), basis_[1].norm(), 0.01);
-
-    //         rviz_tools_->trigger();
-    //     case 3:
-    //         points_[3] = eigen_msg_.translation();
-
-    //         height = (points_[3] - points_[0]).dot(basis_[2] / basis_[2].norm() );
-    //         eigen_pose_.matrix().block<3, 1>(0, 3) = points_[0] + 0.5*(basis_[0] + basis_[1] + basis_[2] / basis_[2].norm() * height);
-
-    //         rviz_tools_->resetMarkerCounts();
-    //         rviz_tools_->publishSphere(points_[0], rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
-    //         rviz_tools_->publishSphere(points_[1], rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
-    //         rviz_tools_->publishSphere(points_[2], rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
-    //         rviz_tools_->publishSphere(points_[3], rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
-    //         rviz_tools_->publishCuboid(eigen_pose_, basis_[0].norm(), basis_[1].norm(), std::abs(height) );
-    //         rviz_tools_->trigger();
-    //         break;
-    // }
-
-
-    // SPHERE STATE MACHINE
-
-    // switch (state) {
-    //     case 4:
-    //         rviz_tools_->resetMarkerCounts();
-    //         rviz_tools_->publishSphere(points_[0], rviz_visual_tools::RED, rviz_visual_tools::XLARGE);
-    //         rviz_tools_->publishSphere(points_[1], rviz_visual_tools::RED, rviz_visual_tools::XLARGE);
-    //         rviz_tools_->publishSphere(points_[2], rviz_visual_tools::RED, rviz_visual_tools::XLARGE);
-    //         rviz_tools_->publishSphere(points_[3], rviz_visual_tools::RED, rviz_visual_tools::XLARGE);
-            
-    //         Eigen::Matrix4d eigen_A_;
-    //         eigen_A_ << points_[0].transpose(), 1,
-    //                     points_[1].transpose(), 1,
-    //                     points_[2].transpose(), 1,
-    //                     points_[3].transpose(), 1;
-    //         Eigen::Vector4d eigen_b_;
-    //         eigen_b_ << -points_[0].squaredNorm(),
-    //                     -points_[1].squaredNorm(),
-    //                     -points_[2].squaredNorm(),
-    //                     -points_[3].squaredNorm();
-            
-    //         Eigen::Vector4d eigen_x_ = eigen_A_.colPivHouseholderQr().solve(eigen_b_);
-    //         Eigen::Vector3d eigen_c_ = eigen_x_.head<3>();
-
-    //         rviz_tools_->publishSphere(-0.5*eigen_c_, rviz_visual_tools::BLUE, std::sqrt(eigen_c_.squaredNorm() - 4*eigen_x_(3) ) );
-
-    //         rviz_tools_->trigger();
-    //         break;
-    // }
-
-    // CYLINDER STATE MACHINE
-
-    // switch (state) {
-    //     case 6:
-    //         points_[6] = eigen_msg_.translation();
-
-    //         rviz_tools_->resetMarkerCounts();
-    //         rviz_tools_->publishSphere(points_[0], rviz_visual_tools::RED, rviz_visual_tools::XLARGE);
-    //         rviz_tools_->publishSphere(points_[1], rviz_visual_tools::RED, rviz_visual_tools::XLARGE);
-    //         rviz_tools_->publishSphere(points_[2], rviz_visual_tools::RED, rviz_visual_tools::XLARGE);
-    //         rviz_tools_->publishSphere(points_[3], rviz_visual_tools::RED, rviz_visual_tools::XLARGE);
-    //         rviz_tools_->publishSphere(points_[4], rviz_visual_tools::RED, rviz_visual_tools::XLARGE);
-    //         rviz_tools_->publishSphere(points_[5], rviz_visual_tools::RED, rviz_visual_tools::XLARGE);
-    //         rviz_tools_->publishSphere(points_[6], rviz_visual_tools::RED, rviz_visual_tools::XLARGE);
-
-    //         // Seed
-    //         eigen_a_ = points_[0];
-    //         eigen_b_ = points_[5];
-    //         eigen_a_(2) = 0;
-    //         radius = 0.5;
-
-    //         for (int i = 0; i < 7; i++) {
-    //             ceres::CostFunction* cost_function =
-    //                 new ceres::AutoDiffCostFunction<CylinderCostFunctor, 1, 3, 3, 1>
-    //                                                (new CylinderCostFunctor(points_[i].cast<double>() ) );
-    //             ceres_problem.AddResidualBlock(cost_function, NULL, eigen_a_.data(), eigen_b_.data(), &radius);
-    //         }
-
-    //         // Set solver ceres_options (precision / method)
-    //         ceres_options.linear_solver_type = ceres::DENSE_SCHUR;
-    //         ceres_options.minimizer_progress_to_stdout = true;
-
-    //         // Solve
-    //         Solve(ceres_options, &ceres_problem, &ceres_summary);
-
-    //         ROS_INFO_STREAM(ceres_summary.FullReport() << std::endl);
-
-    //         ROS_INFO_STREAM(eigen_a_.matrix() );
-    //         ROS_INFO_STREAM(eigen_b_.matrix() );
-    //         ROS_INFO_STREAM(radius);
-    //         state = 7;
-    //         break;
-    //     case 7:
-    //         rviz_tools_->publishCylinder(eigen_a_, eigen_b_, rviz_visual_tools::BLUE, 2*radius);
-    //         rviz_tools_->trigger();
-    //         break;
-    // }
-
-
-    // CONE STATE MACHINE
-
-    // switch (state) {
-    //     case 7:
-    //         basis_[0] = eigen_a_ - eigen_b_;
-    //         basis_[1] = points_[0] - eigen_a_;
-    //         projected_point_ = eigen_a_ + basis_[1].dot(basis_[0] / basis_[0].norm() ) * basis_[0] / basis_[0].norm();
-    //         basis_[1] = points_[0] - projected_point_;
-    //         basis_[2] = basis_[0].cross(basis_[1]);
-
-    //         eigen_pose_.matrix().block<3, 1>(0, 0) = basis_[0] / basis_[0].norm();
-    //         eigen_pose_.matrix().block<3, 1>(0, 1) = basis_[1] / basis_[1].norm();
-    //         eigen_pose_.matrix().block<3, 1>(0, 2) = basis_[2] / basis_[2].norm();
-    //         eigen_pose_.matrix().block<3, 1>(0, 3) = eigen_b_;
-
-    //         rviz_tools_->resetMarkerCounts();
-    //         rviz_tools_->publishSphere(points_[0], rviz_visual_tools::RED, rviz_visual_tools::XLARGE);
-    //         rviz_tools_->publishSphere(points_[1], rviz_visual_tools::RED, rviz_visual_tools::XLARGE);
-    //         rviz_tools_->publishSphere(points_[2], rviz_visual_tools::RED, rviz_visual_tools::XLARGE);
-    //         rviz_tools_->publishSphere(points_[3], rviz_visual_tools::RED, rviz_visual_tools::XLARGE);
-    //         rviz_tools_->publishSphere(points_[4], rviz_visual_tools::RED, rviz_visual_tools::XLARGE);
-    //         rviz_tools_->publishSphere(points_[5], rviz_visual_tools::RED, rviz_visual_tools::XLARGE);
-    //         rviz_tools_->publishSphere(points_[6], rviz_visual_tools::RED, rviz_visual_tools::XLARGE);
-    //         rviz_tools_->publishLine(eigen_a_, eigen_b_, rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
-    //         rviz_tools_->publishCone(eigen_pose_, radius, rviz_visual_tools::BLUE);
-    //         rviz_tools_->trigger();
-    //         break;
-    // }
 
     ros::spinOnce();
     loop_rate_.sleep();
