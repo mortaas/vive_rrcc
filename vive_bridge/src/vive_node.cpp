@@ -488,11 +488,11 @@ void ViveNode::Loop() {
                     tf_difference_poses_[i] = tf_current_pose_.inverseTimes(tf_previous_poses_[i]);
                     tf_previous_poses_[i] = tf_current_pose_;
 
-                    // Lighthouse position monitor
+                    // Lighthouse pose monitor
                     if (tf_difference_poses_[i].getOrigin().length() >= 1e-6 && looped_once)
                     {
-                        ROS_WARN_STREAM("[LIGHTHOUSE MONITOR] Position of " << devices_msg_.device_frames[i] <<
-                                        " has changed! \n The position of tracked devices has likely also changed.");
+                        ROS_WARN_STREAM("[LIGHTHOUSE MONITOR] Pose of " << devices_msg_.device_frames[i] <<
+                                        " has changed! \nThe pose of tracked devices has likely also changed.");
                     }
                 }
 

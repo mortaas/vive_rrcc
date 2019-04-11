@@ -67,22 +67,30 @@ class CalibratingNode {
     // msgs
     geometry_msgs::TransformStamped tf_msg_, tf_msg_pose_;
 
-    geometry_msgs::TransformStamped tf_msg_tool0_, tf_msg_sensor_, tf_msg_diff_;
+    // Hand-eye transform msgs
     geometry_msgs::TransformStamped tf_msg_A_, tf_msg_B_, tf_msg_X_, tf_msg_X_inv_;
+    // Sample transform msgs
+    geometry_msgs::TransformStamped tf_msg_tool0_, tf_msg_sensor_, tf_msg_controller_difference_;
 
+    // Robot pose
     geometry_msgs::PoseStamped pose_msg_, home_pose_msg_;
 
     // Parameters
-    bool calibrate_flag, test_flag;
+    bool calibrate_flag, soft_calibrate_flag, validate_flag;
+
     int averaging_samples, calibration_stations;
-    double calibration_sleep_duration, sample_sleep_duration,
-           yaw_offset, pitch_offset, roll_offset;
+
+    double yaw_offset, pitch_offset, roll_offset;
+
+    double calibration_sleep_duration, sample_sleep_duration;
+
     double radius_lower_bound,              radius_upper_bound,
            phi_position_lower_bound,        phi_position_upper_bound,
            phi_orientation_lower_bound,     phi_orientation_upper_bound,
            theta_position_lower_bound,      theta_position_upper_bound,
            theta_orientation_lower_bound,   theta_orientation_upper_bound;
-    std::string planning_group, vr_frame, controller_frame, test_frame,
+
+    std::string planning_group, vr_frame, controller_frame, controller_FK_frame,
                 base_frame, tool_frame, world_frame;
 
     bool InitParams();
@@ -101,19 +109,23 @@ class CalibratingNode {
     tf2_ros::Buffer tf_buffer_;
     tf2_ros::StaticTransformBroadcaster static_tf_broadcaster_;
     tf2_ros::TransformListener *tf_listener_;
-    // transforms
-    tf2::Transform tf_tool0_[2], tf_sensor_[2];
-    tf2::Transform tf_X_, tf_X_inv_;
-    
-    tf2::Transform tf_pose_, tf_pose_offset_, tf_controller_;
 
-    bool CalibrateViveNode();
+    // Calibration transforms
+    tf2::Transform tf_tool0_[2], tf_sensor_[2];
+    tf2::Transform tf_X_, tf_X_inv_, tf_controller_, tf_vr_offset_;
+    // General transforms
+    tf2::Transform tf_pose_, tf_pose_offset_;
+
     void MeasureRobot(const int &N);
 
+    // Averaging
     bool SampleSensor(const std::string &target_frame, const std::string &source_frame,
                       const int &N, const int &F, geometry_msgs::TransformStamped &tf_msg_avg_);
+
     std::vector<Eigen::Vector3d> eigen_translations_;
     std::vector<Eigen::Quaterniond> eigen_rotations_;
+
+    bool CalibrateViveNode();
 
     void ParkMartinExample();
 
