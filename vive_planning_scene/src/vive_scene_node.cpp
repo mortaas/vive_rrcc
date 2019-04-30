@@ -1,119 +1,6 @@
-#include <signal.h>
+#include "vive_planning_scene/vive_scene_node.h"
+#include "vive_planning_scene/sdf_interface.h"
 
-// ROS
-#include <ros/ros.h>
-// ROS msgs
-#include <vive_bridge/TrackedDevicesStamped.h>
-#include <sensor_msgs/JoyFeedback.h>
-
-// MoveIt!
-// #include <moveit_msgs/ApplyPlanningScene.h>
-// #include <moveit_msgs/PlanningScene.h>
-
-// tf2
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
-#include <tf2_ros/transform_listener.h>
-
-// Eigen
-#include "tf2_eigen/tf2_eigen.h"
-#include <Eigen/Dense>
-
-// RViz
-#include <rviz_visual_tools/rviz_visual_tools.h>
-
-// SDFormat
-#include <sdf/sdf.hh>
-
-// Ceres NLS solver solver
-#include <ceres/ceres.h>
-#include "ceres_cost_functors.h"
-
-// Sophus - C++ implementation of Lie Groups using Eigen
-#include <sophus/se3.hpp>
-
-#include "sophus_ros_conversions/eigen.hpp"
-#include "sophus_ros_conversions/geometry.hpp"
-
-
-// Handle signal [ctrl + c]
-bool sigint_flag = true;
-
-void IntHandler(int signal) {
-    sigint_flag = false;
-}
-
-
-enum E_DefineStates {
-    STATE_DEFINE_POINT = 0,
-    STATE_DEFINE_LINE,
-    STATE_DEFINE_PLANE,
-    STATE_DEFINE_BOX,
-    STATE_DEFINE_BOX_POINT,
-    STATE_DEFINE_BOX_LINE,
-    STATE_DEFINE_BOX_PLANE,
-    STATE_DEFINE_BOX_HEIGHT,
-    STATE_DEFINE_SPHERE,
-    STATE_DEFINE_CYLINDER,
-    STATE_DEFINE_CYLINDER_BOTTOM,
-    STATE_DEFINE_CYLINDER_TOP,
-    STATE_DEFINE_CONE,
-    STATE_DEFINE_CONE_HEIGHT
-};
-
-class SceneNode {
-    ros::NodeHandle nh_;
-    ros::Rate loop_rate_;
-
-    // Publishers
-    ros::Publisher joy_feedback_pub_;
-
-    // Subscribers
-    ros::Subscriber devices_sub_;
-    ros::Subscriber joy_sub_;
-
-    void DevicesCb(const vive_bridge::TrackedDevicesStamped& msg_);
-    void JoyCb(const sensor_msgs::Joy& msg_);
-
-    // ROS msgs
-    geometry_msgs::TransformStamped tf_msg_;
-    sensor_msgs::JoyFeedback joy_feedback_msg_;
-
-    // ros::ServiceClient planning_scene_client_;
-    // moveit_msgs::ApplyPlanningScene planning_scene_srv_;
-    // moveit_msgs::PlanningScene planning_scene_;
-
-    // RViz
-    rviz_visual_tools::RvizVisualToolsPtr rviz_tools_, rviz_infinite_tools_;
-
-    // SDFormat
-    sdf::SDFPtr sdf_;
-
-    // tf2
-    tf2_ros::Buffer tf_buffer_;
-    tf2_ros::TransformListener *tf_listener_;
-
-    tf2::Transform tf_tracker_;
-    std::string controller_frame, tool_frame, tracker_frame, world_frame;
-    unsigned int controller_id, tracker_id;
-
-    // Eigen
-    Eigen::Affine3d eigen_msg_, eigen_pose_, eigen_controller_offset_;
-
-    std::vector<Eigen::Vector3d> points_;
-    Eigen::Vector3d vecs_[3], basis_[3], projected_point_;
-    Eigen::Vector3d eigen_a_, eigen_b_, eigen_point_;
-    double angle, height, radius, scale;
-
-    unsigned int state;
-
-    public:
-        SceneNode(int frequency);
-        ~SceneNode();
-
-        bool Init();
-        void Loop();
-        void Shutdown();
-};
 
 void SceneNode::DevicesCb(const vive_bridge::TrackedDevicesStamped& msg_) {
     /**
@@ -134,8 +21,7 @@ void SceneNode::DevicesCb(const vive_bridge::TrackedDevicesStamped& msg_) {
 
 SceneNode::SceneNode(int frequency)
     : loop_rate_(frequency),
-      tf_listener_(new tf2_ros::TransformListener(tf_buffer_) ),
-      sdf_(new sdf::SDF() )
+      tf_listener_(new tf2_ros::TransformListener(tf_buffer_) )
 {
     // Publishers
     joy_feedback_pub_ = nh_.advertise<sensor_msgs::JoyFeedback>("/vive_node/joy/haptic_feedback", 10, true);
@@ -145,37 +31,12 @@ SceneNode::SceneNode(int frequency)
     // planning_scene_client_ = nh_.serviceClient<moveit_msgs::ApplyPlanningScene>("apply_planning_scene");
     // planning_scene_client_.waitForExistence();
 
+    // SDFormat interface
+    sdf_ = new SDFinterface();
+
     // RViz
     rviz_tools_.reset(new rviz_visual_tools::RvizVisualTools(world_frame, "/rviz_visual_markers") );
     rviz_infinite_tools_.reset(new rviz_visual_tools::RvizVisualTools(world_frame, "/rviz_infinite_visual_markers") );
-
-    // SDFormat
-    sdf::init(sdf_);
-
-    sdf::ElementPtr sdf_root_ = sdf_->Root();
-
-    sdf::ElementPtr sdf_model_ = sdf_root_->AddElement("model");
-    sdf_model_->GetAttribute("name")->Set("box");
-
-    sdf::ElementPtr sdf_pose_ = sdf_model_->AddElement("pose");
-    // sdf_pose_->GetAttribute("frame")->Set("box_frame");
-
-    sdf::ElementPtr sdf_link_ = sdf_model_->AddElement("link");
-    sdf_link_->GetAttribute("name")->Set("link");
-
-    sdf::ElementPtr sdf_collision_ = sdf_link_->AddElement("collision");
-    sdf_collision_->GetAttribute("name")->Set("collision");
-
-    sdf::ElementPtr sdf_visual_ = sdf_link_->AddElement("visual");
-    sdf_visual_->GetAttribute("name")->Set("visual");
-
-    sdf::ElementPtr sdf_collision_geometry_ = sdf_collision_->GetElement("geometry");
-    sdf::ElementPtr sdf_collision_box_ = sdf_collision_geometry_->AddElement("box");
-
-    sdf::ElementPtr sdf_visual_geometry_ = sdf_visual_->GetElement("geometry");
-    sdf::ElementPtr sdf_visual_box_ = sdf_visual_geometry_->AddElement("box");
-
-    sdf_->Write("test.sdf");
 
     // Define joy feedback message
     joy_feedback_msg_.type = joy_feedback_msg_.TYPE_RUMBLE;

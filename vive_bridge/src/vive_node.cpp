@@ -27,8 +27,8 @@ ViveNode::ViveNode(int frequency)
 
     // System commands for dumping and loading dynamic reconfigure parameters
     // Temporary workaround as there is no C++ API for dynamic reconfigure
-    cmd_dynparam_dump = "rosrun dynamic_reconfigure dynparam dump " + NODE_NAME + 
-                        " " + PACKAGE_PATH + "/cfg/dynparam.yaml";
+    cmd_dynparam_dump = "rosrun dynamic_reconfigure dynparam dump " +
+                        NODE_NAME + " " + PACKAGE_PATH + "/config/dynparam";
 
     // Publisher and service for info about tracked devices
     devices_pub_ = pvt_nh_.advertise<vive_bridge::TrackedDevicesStamped>("tracked_devices", 10, true);
@@ -245,8 +245,8 @@ void ViveNode::SendOffsetTransform() {
      */
 
     orientation_offset_.setRPY(vr_roll_offset,
-                            vr_pitch_offset,
-                            vr_yaw_offset);
+                               vr_pitch_offset,
+                               vr_yaw_offset);
 
     tf_offset_.setOrigin(tf2::Vector3(vr_x_offset,
                                       vr_y_offset,
@@ -367,8 +367,15 @@ void ViveNode::Shutdown() {
      * Shuts down the connection to the VR hardware and cleans up the OpenVR API
      */
 
-    // Dump dynamic reconfigure parameters
-    system(cmd_dynparam_dump.c_str() );
+    // Get current time as string
+    std::string simple_time = boost::posix_time::to_simple_string(ros::Time::now().toBoost() );
+    // Replace empty chars in time string with underscores
+    std::replace(simple_time.begin(), simple_time.end(), ' ', '_');
+    // Dump dynamic reconfigure parameters with timestamp as backup
+    system((cmd_dynparam_dump + "_" + simple_time + ".yaml").c_str() );
+
+    // Update dynamic reconfigure parameters
+    system((cmd_dynparam_dump + ".yaml").c_str() );
 
     vr_.Shutdown();
     ros::shutdown();
@@ -485,14 +492,14 @@ void ViveNode::Loop() {
                     twist_pubs_map_[TrackedDevices[i].serial_number].publish(twist_msg_);
                 } else {
                     // Compute difference between current and previous pose
-                    tf_difference_poses_[i] = tf_current_pose_.inverseTimes(tf_previous_poses_[i]);
+                    tf_difference_poses_[i] = tf_previous_poses_[i].inverseTimes(tf_current_pose_);
                     tf_previous_poses_[i] = tf_current_pose_;
 
                     // Lighthouse pose monitor
                     if (tf_difference_poses_[i].getOrigin().length() >= 1e-6 && looped_once)
                     {
                         ROS_WARN_STREAM("[LIGHTHOUSE MONITOR] Pose of " << devices_msg_.device_frames[i] <<
-                                        " has changed! \nThe pose of tracked devices has likely also changed.");
+                                        " has changed! \nTracked devices has likely also changed their pose.");
                     }
                 }
 

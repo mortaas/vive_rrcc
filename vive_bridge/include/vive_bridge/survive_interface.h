@@ -1,5 +1,4 @@
-#ifndef _SURVIVE_INTERFACE_H_
-#define _SURVIVE_INTERFACE_H_
+#pragma once
 
 // STL
 #include <algorithm>
@@ -94,5 +93,3 @@ class ViveInterface {
         void SetErrorMsgCallback(ErrorMsgCallback fn);
         void SetFatalMsgCallback(FatalMsgCallback fn);
 };
-
-#endif  // _SURVIVE_INTERFACE_H_

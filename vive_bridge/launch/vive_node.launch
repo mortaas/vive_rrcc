@@ -5,7 +5,7 @@
     <arg name="vr_frame"      default="world_vr"/>
 
     <!-- Load dynamic reconfigure parameters -->
-    <node name="vive_dynparam" pkg="dynamic_reconfigure" type="dynparam" args="load vive_node $(find vive_bridge)/cfg/dynparam.yaml"/>
+    <node name="vive_dynparam" pkg="dynamic_reconfigure" type="dynparam" args="load vive_node $(find vive_bridge)/config/dynparam.yaml"/>
 
     <!-- Launch node through steam with shell script -->
     <node name="vive_node" pkg="vive_bridge" type="launch.sh" output="screen" required="true">

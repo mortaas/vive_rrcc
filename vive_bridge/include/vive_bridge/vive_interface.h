@@ -1,5 +1,4 @@
-#ifndef _VR_INTERFACE_H_
-#define _VR_INTERFACE_H_
+#pragma once
 
 #include <openvr.h>
 #include <boost/function.hpp>
@@ -63,5 +62,3 @@ class ViveInterface {
         void SetErrorMsgCallback(ErrorMsgCallback fn);
         void SetFatalMsgCallback(FatalMsgCallback fn);
 };
-
-#endif  // _VR_INTERFACE_H_
