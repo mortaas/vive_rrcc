@@ -73,6 +73,13 @@ void SceneNode::JoyCb(const sensor_msgs::Joy& msg_) {
                 case STATE_DEFINE_BOX_HEIGHT: {
                     rviz_infinite_tools_->publishCuboid(eigen_pose_, vecs_[0].norm(), vecs_[1].norm(), std::abs(height), rviz_visual_tools::BLUE);
                     rviz_infinite_tools_->trigger();
+
+                    // Compute RPY-angles from transformation matrix
+                    rpy_angles_ = eigen_pose_.rotation().eulerAngles(2, 1, 0);
+
+                    sdf_->AddBox(eigen_pose_.translation()[0], eigen_pose_.translation()[1], eigen_pose_.translation()[2],
+                                 rpy_angles_[0], rpy_angles_[1], rpy_angles_[2],
+                                 vecs_[0].norm(), vecs_[1].norm(), std::abs(height), world_frame);
                     
                     state = STATE_DEFINE_BOX_POINT;
                     points_.clear();
@@ -123,12 +130,12 @@ void SceneNode::JoyCb(const sensor_msgs::Joy& msg_) {
         }
     }
 
-    if (msg_.buttons[3]) { // Trigger button
-        joy_feedback_pub_.publish(joy_feedback_msg_);
+    // if (msg_.buttons[3]) { // Trigger button
+    //     joy_feedback_pub_.publish(joy_feedback_msg_);
 
         // points_.push_back(eigen_point_);
         // ROS_INFO_STREAM("Point " << points_.size() << ": \n" << eigen_point_.matrix() );
-    }
+    // }
 
     if (msg_.buttons[2]) { // Touchpad button
         // CONE
@@ -224,7 +231,8 @@ void SceneNode::JoyCb(const sensor_msgs::Joy& msg_) {
 
             if (state != STATE_DEFINE_CYLINDER &&
                 state != STATE_DEFINE_CYLINDER_BOTTOM &&
-                state != STATE_DEFINE_CYLINDER_TOP) {
+                state != STATE_DEFINE_CYLINDER_TOP)
+            {
                 state = STATE_DEFINE_CYLINDER;
                 points_.clear();
             } else {
@@ -355,6 +363,9 @@ void SceneNode::JoyCb(const sensor_msgs::Joy& msg_) {
 
                     rviz_infinite_tools_->publishSphere(eigen_c_, rviz_visual_tools::BLUE, 2*radius);
                     rviz_infinite_tools_->trigger();
+
+                    // Add sphere object to SDF tree
+                    sdf_->AddSphere(eigen_c_[0], eigen_c_[1], eigen_c_[2], radius, world_frame);
 
                     state = STATE_DEFINE_SPHERE;
                     points_.clear();
@@ -500,7 +511,36 @@ void SceneNode::Loop() {
         case STATE_DEFINE_CYLINDER_TOP: {
             vecs_[2] = eigen_b_ + (eigen_point_ - eigen_b_).dot(basis_[0]) * basis_[0];
 
-            rviz_tools_->publishCylinder(eigen_a_, vecs_[2], rviz_visual_tools::BLUE, 2*radius);
+            rviz_tools_->publishCylinder(vecs_[1], vecs_[2], rviz_visual_tools::BLUE, 2*radius);
+
+            // Cylinder center point
+            vecs_[3] = 0.5*(vecs_[2] - vecs_[1]);
+            vecs_[4] = vecs_[1] + vecs_[3];
+
+            // Z-axis along cylinder axis
+            basis_[2] = vecs_[3] / vecs_[3].norm();
+
+            // Compute x-axis from first point
+            vecs_[5] = (points_[0] - vecs_[1]).dot(vecs_[3] / vecs_[3].norm() ) * vecs_[3] / vecs_[3].norm();
+            basis_[0] = points_[0] - (vecs_[1] + vecs_[5]);
+            // Normalize vector from point
+            basis_[0] /= basis_[0].norm();
+
+            basis_[1] = basis_[0].cross(basis_[2]);
+
+            // Define transformation matrix from basis vectors and center of cylinder
+            eigen_pose_.matrix().block<3, 1>(0, 0) = basis_[0] / basis_[0].norm();
+            eigen_pose_.matrix().block<3, 1>(0, 1) = basis_[1] / basis_[1].norm();
+            eigen_pose_.matrix().block<3, 1>(0, 2) = basis_[2] / basis_[2].norm();
+            eigen_pose_.matrix().block<3, 1>(0, 3) = vecs_[4];
+            // Compute RPY-angles from transformation matrix
+            rpy_angles_ = eigen_pose_.rotation().eulerAngles(2, 1, 0);
+
+            // Add cylinder object to SDF tree
+            sdf_->AddCylinder(vecs_[4][0], vecs_[4][1], vecs_[4][2],
+                              rpy_angles_[0], rpy_angles_[1], rpy_angles_[2],
+                              radius, 2*vecs_[3].norm(), world_frame);
+
             break;
         }
 
@@ -528,6 +568,14 @@ void SceneNode::Loop() {
     loop_rate_.sleep();
 }
 void SceneNode::Shutdown() {
+      /**
+     * Runs before shutting down the node
+     */
+
+    // Write SDF tree to file
+    sdf_->WriteSDF("scene");
+
+    ros::shutdown();
 }
 
 

@@ -120,6 +120,7 @@ void CalibrationTestNode::Shutdown() {
      * Runs before shutting down the node
      */
 
+    ros::shutdown();
 }
 
 

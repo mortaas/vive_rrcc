@@ -15,7 +15,7 @@ The package exposes the position and orientation (pose) of each device as coordi
 
 ![Example of the tf tree structure that is used in this package](doc/frames.png)
 
-The package can also publishes the linear and angular velocities (twists) of tracked devices as a geometry_msgs/TwistStamped message on the */vive_node/twist/&lt;device type&gt;_&lt;serial number&gt;* topic, e.g. */vive_node/twist/controller_LHR_FF6FFD46*. Axes and buttons on controllers can also be published as a sensor_msgs/Joy message on the */vive_node/joy/&lt;device type&gt;_&lt;serial number&gt;* topic, e.g. */vive_node/joy/controller_LHR_FF6FFD46*. Joy messages are only published when the controllers are interacted with. These publishers are not enabled by default, but they are easily enabled during runtime by using the [rqt_reconfigure](http://wiki.ros.org/rqt_reconfigure) package.
+The package can also publish the linear and angular velocities (twists) of tracked devices as a geometry_msgs/TwistStamped message on the */vive_node/twist/&lt;device type&gt;_&lt;serial number&gt;* topic, e.g. */vive_node/twist/controller_LHR_FF6FFD46*. Axes and buttons on controllers can also be published as a sensor_msgs/Joy message on the */vive_node/joy/&lt;device type&gt;_&lt;serial number&gt;* topic, e.g. */vive_node/joy/controller_LHR_FF6FFD46*. Joy messages are only published when the controllers are interacted with. These publishers are not enabled by default, but they are easily enabled during runtime by using the [rqt_reconfigure](http://wiki.ros.org/rqt_reconfigure) package.
 
 ### Visualization
 

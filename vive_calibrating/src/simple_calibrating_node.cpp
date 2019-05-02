@@ -169,7 +169,7 @@ void CalibratingNode::Shutdown() {
      * Runs before shutting down the node
      */
 
-
+    ros::shutdown();
 }
 
 void CalibratingNode::JoyCb(const sensor_msgs::Joy& msg_) {

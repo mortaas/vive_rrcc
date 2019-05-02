@@ -40,6 +40,7 @@ void ParkMartinNode::Shutdown() {
      * Runs before shutting down the node
      */
 
+    ros::shutdown();
 }
 
 bool ParkMartinNode::AddSample(vive_calibrating::AddSample::Request  &req,

@@ -444,6 +444,11 @@ void ToolCalibratingNode::Loop() {
     loop_rate_.sleep();
 }
 void ToolCalibratingNode::Shutdown() {
+      /**
+     * Runs before shutting down the node
+     */
+
+    ros::shutdown();
 }
 
 

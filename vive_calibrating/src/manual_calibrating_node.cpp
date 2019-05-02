@@ -264,6 +264,7 @@ void CalibratingNode::Shutdown() {
      */
 
     bag_.close();
+    ros::shutdown();
 }
 
 void CalibratingNode::JoyCb(const sensor_msgs::Joy& msg_) {

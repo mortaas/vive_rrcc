@@ -220,7 +220,7 @@ void CalibratingNode::Shutdown() {
      * Runs before shutting down the node
      */
 
-    
+    ros::shutdown();
 }
 
 void CalibratingNode::DevicesCb(const vive_bridge::TrackedDevicesStamped& msg_) {

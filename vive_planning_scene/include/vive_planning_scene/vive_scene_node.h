@@ -102,7 +102,7 @@ class SceneNode {
     Eigen::Affine3d eigen_msg_, eigen_pose_, eigen_controller_offset_;
 
     std::vector<Eigen::Vector3d> points_;
-    Eigen::Vector3d vecs_[3], basis_[3], projected_point_;
+    Eigen::Vector3d vecs_[6], basis_[3], projected_point_, rpy_angles_;
     Eigen::Vector3d eigen_a_, eigen_b_, eigen_point_;
     double angle, height, radius, scale;
 
