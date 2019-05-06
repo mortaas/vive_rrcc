@@ -43,6 +43,10 @@ void SDFinterface::AddPlane(double x, double y, double z,
     sdf::ElementPtr sdf_model_ = sdf_world_->AddElement("model");
     sdf_model_->GetAttribute("name")->Set("plane_" + std::to_string(model_count) );
 
+    // Make model immovable, i.e. disable body dynamics
+    sdf::ElementPtr sdf_static_ = sdf_model_->AddElement("static");
+    sdf_static_->Set("1");
+
     // Set plane pose (center)
     sdf::ElementPtr sdf_pose_ = sdf_model_->AddElement("pose");
     sdf_pose_->Set(std::to_string(x) + " " + std::to_string(y) + " " + std::to_string(z) + " " +
@@ -88,6 +92,10 @@ void SDFinterface::AddBox(double x, double y, double z,
     sdf::ElementPtr sdf_model_ = sdf_world_->AddElement("model");
     sdf_model_->GetAttribute("name")->Set("box_" + std::to_string(model_count) );
 
+    // Make model immovable, i.e. disable body dynamics
+    sdf::ElementPtr sdf_static_ = sdf_model_->AddElement("static");
+    sdf_static_->Set("1");
+
     // Set box pose (center)
     sdf::ElementPtr sdf_pose_ = sdf_model_->AddElement("pose");
     sdf_pose_->Set(std::to_string(x) + " " + std::to_string(y) + " " + std::to_string(z) + " " +
@@ -113,7 +121,7 @@ void SDFinterface::AddBox(double x, double y, double z,
     sdf::ElementPtr sdf_visual_geometry_ = sdf_visual_->GetElement("geometry");
     sdf::ElementPtr sdf_visual_box_ = sdf_visual_geometry_->AddElement("box");
     sdf::ElementPtr sdf_visual_box_size = sdf_visual_box_->GetElement("size");
-    sdf_collision_box_size->Set(std::to_string(L) + " " + std::to_string(W) + " " + std::to_string(H) );
+    sdf_visual_box_size->Set(std::to_string(L) + " " + std::to_string(W) + " " + std::to_string(H) );
 }
 
 void SDFinterface::AddSphere(double x, double y, double z, double radius,
@@ -129,6 +137,10 @@ void SDFinterface::AddSphere(double x, double y, double z, double radius,
     // Add model to SDF tree
     sdf::ElementPtr sdf_model_ = sdf_world_->AddElement("model");
     sdf_model_->GetAttribute("name")->Set("sphere_" + std::to_string(model_count) );
+
+    // Make model immovable, i.e. disable body dynamics
+    sdf::ElementPtr sdf_static_ = sdf_model_->AddElement("static");
+    sdf_static_->Set("1");
 
     // Set sphere pose (center), orientation does not matter in this case
     sdf::ElementPtr sdf_pose_ = sdf_model_->AddElement("pose");
@@ -171,6 +183,10 @@ void SDFinterface::AddCylinder(double x, double y, double z,
     // Add model to SDF tree
     sdf::ElementPtr sdf_model_ = sdf_world_->AddElement("model");
     sdf_model_->GetAttribute("name")->Set("cylinder_" + std::to_string(model_count) );
+
+    // Make model immovable, i.e. disable body dynamics
+    sdf::ElementPtr sdf_static_ = sdf_model_->AddElement("static");
+    sdf_static_->Set("1");
 
     // Set cylinder pose (center)
     sdf::ElementPtr sdf_pose_ = sdf_model_->AddElement("pose");

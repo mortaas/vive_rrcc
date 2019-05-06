@@ -534,7 +534,7 @@ void SceneNode::Loop() {
             eigen_pose_.matrix().block<3, 1>(0, 2) = basis_[2] / basis_[2].norm();
             eigen_pose_.matrix().block<3, 1>(0, 3) = vecs_[4];
             // Compute RPY-angles from transformation matrix
-            rpy_angles_ = eigen_pose_.rotation().eulerAngles(2, 1, 0);
+            rpy_angles_ = eigen_pose_.rotation().eulerAngles(0, 1, 2);
 
             // Add cylinder object to SDF tree
             sdf_->AddCylinder(vecs_[4][0], vecs_[4][1], vecs_[4][2],

@@ -49,8 +49,8 @@
         
 
         <!-- Sphere sampling parameters for calibration -->
-        <param name="radius_lower_bound"            value="1.4"/>
-        <param name="radius_upper_bound"            value="1.6"/>
+        <param name="radius_lower_bound"            value="1.2"/>
+        <param name="radius_upper_bound"            value="1.4"/>
 
         <!-- <param name="theta_position_lower_bound"    value="$(eval 5.75 * arg('M_PI_4') )"/>
         <param name="theta_position_upper_bound"    value="$(eval 6.25 * arg('M_PI_4') )"/> -->
@@ -58,10 +58,17 @@
         <!-- <param name="theta_position_lower_bound"    value="$(eval -0.25 * arg('M_PI_4') )"/>
         <param name="theta_position_upper_bound"    value="$(eval  0.25 * arg('M_PI_4') )"/> -->
 
-        <param name="theta_position_lower_bound"    value="$(eval -1.25 * arg('M_PI_4') )"/>
+        <!-- Floor -->
+        <!-- <param name="theta_position_lower_bound"    value="$(eval -1.25 * arg('M_PI_4') )"/>
         <param name="theta_position_upper_bound"    value="$(eval -0.75 * arg('M_PI_4') )"/>
         <param name="phi_position_lower_bound"      value="$(eval  0.5  * arg('M_PI_4') )"/>
-        <param name="phi_position_upper_bound"      value="$(eval  0.75 * arg('M_PI_4') )"/>
+        <param name="phi_position_upper_bound"      value="$(eval  0.75 * arg('M_PI_4') )"/> -->
+
+        <!-- Gantry -->
+        <param name="theta_position_lower_bound"    value="$(eval  2.25 * arg('M_PI_4') )"/>
+        <param name="theta_position_upper_bound"    value="$(eval  1.75 * arg('M_PI_4') )"/>
+        <param name="phi_position_lower_bound"      value="$(eval  0.75 * arg('M_PI_4') )"/>
+        <param name="phi_position_upper_bound"      value="$(eval  1.   * arg('M_PI_4') )"/>
 
         <!-- <param name="theta_orientation_lower_bound" value="$(eval 5.   * arg('M_PI_4') )"/>
         <param name="theta_orientation_upper_bound" value="$(eval 6.   * arg('M_PI_4') )"/> -->
@@ -69,8 +76,15 @@
         <!-- <param name="theta_orientation_lower_bound" value="$(eval -1.  * arg('M_PI_4') )"/>
         <param name="theta_orientation_upper_bound" value="$(eval  1.  * arg('M_PI_4') )"/> -->
 
-        <param name="theta_orientation_lower_bound" value="$(eval  0.   * arg('M_PI_4') )"/>
+        <!-- Floor -->
+        <!-- <param name="theta_orientation_lower_bound" value="$(eval  0.   * arg('M_PI_4') )"/>
         <param name="theta_orientation_upper_bound" value="$(eval -2.   * arg('M_PI_4') )"/>
+        <param name="phi_orientation_lower_bound"   value="$(eval  1.25 * arg('M_PI_4') )"/>
+        <param name="phi_orientation_upper_bound"   value="$(eval  2.75 * arg('M_PI_4') )"/> -->
+
+        <!-- Gantry -->
+        <param name="theta_orientation_lower_bound" value="$(eval  1.   * arg('M_PI_4') )"/>
+        <param name="theta_orientation_upper_bound" value="$(eval  3.   * arg('M_PI_4') )"/>
         <param name="phi_orientation_lower_bound"   value="$(eval  1.25 * arg('M_PI_4') )"/>
         <param name="phi_orientation_upper_bound"   value="$(eval  2.75 * arg('M_PI_4') )"/>
 
@@ -86,8 +100,10 @@
         <param name="z_center"                      value=" 1."/>
 
         <!-- Robot and sensor test frames -->
-        <rosparam param="base_frame">"floor_base"</rosparam>
-        <rosparam param="tool_frame">"floor_tool0"</rosparam>
+        <!-- <rosparam param="base_frame">"floor_base"</rosparam> -->
+        <!-- <rosparam param="tool_frame">"floor_tool0"</rosparam> -->
+        <rosparam param="base_frame">"gantry_base"</rosparam>
+        <rosparam param="tool_frame">"gantry_tool0"</rosparam>
         <rosparam param="controller_FK_frame">"controller_FK"</rosparam>
 
         <!-- Robot joint states -->

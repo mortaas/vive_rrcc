@@ -179,6 +179,8 @@ bool CalibratingNode::Init() {
     pose_msg_.header.frame_id = base_frame;
     robot_->GetCurrentPose(home_pose_msg_);
 
+    ROS_INFO_STREAM(home_pose_msg_);
+
     if (calibrate_flag) {
         MeasureRobot(calibration_stations);
     }

@@ -19,14 +19,23 @@ RobotInterface::RobotInterface(const std::string &PLANNING_GROUP,
 
     // Get joint names of move group
     joint_names = move_group_.getJointNames();
+
+    // Limit robot velocity and acceleration
+    move_group_.setMaxVelocityScalingFactor(0.1);
+    move_group_.setMaxAccelerationScalingFactor(0.1);
 }
 
 void RobotInterface::SetPoseTarget(const geometry_msgs::PoseStamped &pose_) {
     move_group_.setPoseTarget(pose_);
 
-    // // Convert pose to transform
-    // tf2::convert(pose_.pose, tf_pose_);
-    // tf2::convert(tf_pose_, tf_msg_.transform);
+    ROS_INFO_STREAM(pose_);
+
+    // Convert pose to transform
+    tf2::convert(pose_.pose, tf_pose_);
+    tf2::convert(tf_pose_, tf_msg_.transform);
+    tf_msg_.header.frame_id = "gantry_base";
+    static_tf_broadcaster_.sendTransform(tf_msg_);
+    tf_msg_.header.frame_id = "root";
 }
 
 void RobotInterface::SetJointValueTarget(const std::vector<double> &joint_state) {

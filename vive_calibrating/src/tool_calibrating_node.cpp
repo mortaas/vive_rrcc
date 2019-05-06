@@ -288,7 +288,14 @@ void ToolCalibratingNode::JoyCb(const sensor_msgs::Joy& msg_) {
 
                         ROS_INFO_STREAM("Sphere center point (relative to tracker): \n" << eigen_tool_.translation().matrix() );
                         ROS_INFO_STREAM("Sphere radius: " << eigen_tool_.translation().norm() );
-                        // ROS_INFO_STREAM("Sphere radius: " << std::abs(radius) );
+                        ROS_INFO_STREAM("rosrun tf2_ros static_transform_publisher " << tf_msg_tool_.transform.translation.x << " "
+                                                                                     << tf_msg_tool_.transform.translation.y << " "
+                                                                                     << tf_msg_tool_.transform.translation.z << " "
+                                                                                     << tf_msg_tool_.transform.rotation.x << " "
+                                                                                     << tf_msg_tool_.transform.rotation.y << " "
+                                                                                     << tf_msg_tool_.transform.rotation.z << " "
+                                                                                     << tf_msg_tool_.transform.rotation.w << " "
+                                                                                     << tool_frame << " " << tracker_frame);
 
                         rviz_tools_->deleteAllMarkers();
                         rviz_tools_->publishSphere(eigen_c_, rviz_visual_tools::BLUE, 2*radius);
