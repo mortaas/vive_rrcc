@@ -20,6 +20,8 @@
 
     <!-- Number of pose samples to average for each measurement -->
     <arg name="samples"    default="480"/>
+    <!-- Sampling frequency used for averaging -->
+    <arg name="frequency"  default="30"/>
     <!-- Number of measurements for calibration (>= 3) -->
     <arg name="stations"   default="10"/>
 
@@ -42,6 +44,7 @@
         <param name="planning_group"                value="$(arg group)"/>
 
         <param name="averaging_samples"             value="$(arg samples)"/>
+        <param name="sampling_frequency"            value="$(arg frequency)"/>
         <param name="calibration_stations"          value="$(arg stations)"/>
 
         <param name="calibration_sleep_duration"    value="$(arg cduration)"/>
@@ -49,8 +52,8 @@
         
 
         <!-- Sphere sampling parameters for calibration -->
-        <param name="radius_lower_bound"            value="1.2"/>
-        <param name="radius_upper_bound"            value="1.4"/>
+        <param name="radius_lower_bound"            value="1.4"/>
+        <param name="radius_upper_bound"            value="1.6"/>
 
         <!-- <param name="theta_position_lower_bound"    value="$(eval 5.75 * arg('M_PI_4') )"/>
         <param name="theta_position_upper_bound"    value="$(eval 6.25 * arg('M_PI_4') )"/> -->
@@ -67,8 +70,8 @@
         <!-- Gantry -->
         <param name="theta_position_lower_bound"    value="$(eval  2.25 * arg('M_PI_4') )"/>
         <param name="theta_position_upper_bound"    value="$(eval  1.75 * arg('M_PI_4') )"/>
-        <param name="phi_position_lower_bound"      value="$(eval  0.75 * arg('M_PI_4') )"/>
-        <param name="phi_position_upper_bound"      value="$(eval  1.   * arg('M_PI_4') )"/>
+        <param name="phi_position_lower_bound"      value="$(eval  0.5  * arg('M_PI_4') )"/>
+        <param name="phi_position_upper_bound"      value="$(eval  0.75 * arg('M_PI_4') )"/>
 
         <!-- <param name="theta_orientation_lower_bound" value="$(eval 5.   * arg('M_PI_4') )"/>
         <param name="theta_orientation_upper_bound" value="$(eval 6.   * arg('M_PI_4') )"/> -->
@@ -83,10 +86,10 @@
         <param name="phi_orientation_upper_bound"   value="$(eval  2.75 * arg('M_PI_4') )"/> -->
 
         <!-- Gantry -->
-        <param name="theta_orientation_lower_bound" value="$(eval  1.   * arg('M_PI_4') )"/>
-        <param name="theta_orientation_upper_bound" value="$(eval  3.   * arg('M_PI_4') )"/>
-        <param name="phi_orientation_lower_bound"   value="$(eval  1.25 * arg('M_PI_4') )"/>
-        <param name="phi_orientation_upper_bound"   value="$(eval  2.75 * arg('M_PI_4') )"/>
+        <param name="theta_orientation_lower_bound" value="$(eval  1.25 * arg('M_PI_4') )"/>
+        <param name="theta_orientation_upper_bound" value="$(eval  2.75 * arg('M_PI_4') )"/>
+        <param name="phi_orientation_lower_bound"   value="$(eval  1.5  * arg('M_PI_4') )"/>
+        <param name="phi_orientation_upper_bound"   value="$(eval  2.5  * arg('M_PI_4') )"/>
 
         <!-- Parameters for sampling of rectangular tracking volume -->
         <param name="length"                        value="2."/>

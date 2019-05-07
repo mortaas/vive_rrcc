@@ -80,7 +80,7 @@ class CalibratingNode {
     // Parameters
     bool calibrate_flag, soft_calibrate_flag, validate_flag;
 
-    int averaging_samples, calibration_stations;
+    int averaging_samples, sampling_frequency, calibration_stations;
 
     double yaw_offset, pitch_offset, roll_offset;
 

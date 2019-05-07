@@ -37,7 +37,7 @@
 
 class RobotInterface {
     // msgs
-    geometry_msgs::TransformStamped tf_msg_;
+    geometry_msgs::TransformStamped tf_msg_, tf_msg_model_planning_;
     geometry_msgs::PoseStamped pose_msg_;
 
     // MoveIt!

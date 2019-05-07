@@ -12,6 +12,9 @@ RobotInterface::RobotInterface(const std::string &PLANNING_GROUP,
     move_group_.setPoseReferenceFrame(PLANNING_FRAME);
     // Transform from model frame to planning frame
     eigen_model_planning_ = kinematic_state_->getFrameTransform(PLANNING_FRAME);
+    tf_msg_model_planning_ = tf2::eigenToTransform(eigen_model_planning_);
+    tf_msg_model_planning_.header.frame_id = kinematic_model_->getModelFrame();
+    tf_msg_model_planning_.child_frame_id = PLANNING_FRAME;
 
     // Initialize transform headers
     tf_msg_.header.frame_id = kinematic_model_->getModelFrame();
@@ -28,14 +31,12 @@ RobotInterface::RobotInterface(const std::string &PLANNING_GROUP,
 void RobotInterface::SetPoseTarget(const geometry_msgs::PoseStamped &pose_) {
     move_group_.setPoseTarget(pose_);
 
-    ROS_INFO_STREAM(pose_);
-
     // Convert pose to transform
     tf2::convert(pose_.pose, tf_pose_);
     tf2::convert(tf_pose_, tf_msg_.transform);
-    tf_msg_.header.frame_id = "gantry_base";
+    tf_msg_.header.frame_id = pose_.header.frame_id;
     static_tf_broadcaster_.sendTransform(tf_msg_);
-    tf_msg_.header.frame_id = "root";
+    tf_msg_.header.frame_id = kinematic_model_->getModelFrame();
 }
 
 void RobotInterface::SetJointValueTarget(const std::vector<double> &joint_state) {
