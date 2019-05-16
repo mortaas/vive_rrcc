@@ -266,12 +266,13 @@ void ToolCalibratingNode::JoyCb(const sensor_msgs::Joy& msg_) {
 
                         // Solve NLS problem
                         Solve(ceres_options, &ceres_problem, &ceres_summary);
-                        ROS_INFO_STREAM(ceres_summary.FullReport() << std::endl);
+                        // ROS_INFO_STREAM(ceres_summary.FullReport() << std::endl);
 
                         // for (std::vector<Eigen::Vector3d>::iterator it_ = points_.begin(); it_ != points_.end(); ++it_) {
                         //     eigen_tool_.translation() += eigen_msg_.rotation().inverse()*(eigen_c_ - *it_);
                         // }
                         // eigen_tool_.translation() /= n_points;
+
 
                         if (n_points > 4) {
                             eigen_tool_.translation() += (eigen_msg_.rotation().inverse()*(eigen_c_ - eigen_point_) - 
@@ -279,6 +280,7 @@ void ToolCalibratingNode::JoyCb(const sensor_msgs::Joy& msg_) {
                         } else {
                             eigen_tool_.translation() = eigen_msg_.rotation().inverse()*(eigen_c_ - eigen_point_);
                         }
+                        
                         
                         // eigen_tool_.translation() = Eigen::Vector3d(0., 0., std::abs(radius) );
                         tf_msg_tool_.transform = tf2::eigenToTransform(eigen_tool_).transform;
@@ -313,58 +315,58 @@ void ToolCalibratingNode::JoyCb(const sensor_msgs::Joy& msg_) {
                     }
                 }
 
-                if (state == STATE_CHECKERBOARD_POINTS) {
-                    tracker_poses_.push_back(sophus_ros_conversions::transformMsgToSophus(tf_msg_.transform).cast<double>() );
-                    ROS_INFO_STREAM("Pose " << tracker_poses_.size() << "/" << checkerboard_points_.size() << ":");
+                // if (state == STATE_CHECKERBOARD_POINTS) {
+                //     tracker_poses_.push_back(sophus_ros_conversions::transformMsgToSophus(tf_msg_.transform).cast<double>() );
+                //     ROS_INFO_STREAM("Pose " << tracker_poses_.size() << "/" << checkerboard_points_.size() << ":");
 
-                    rviz_tools_->publishSphere((eigen_msg_ * eigen_tool_).translation(), rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
+                //     rviz_tools_->publishSphere((eigen_msg_ * eigen_tool_).translation(), rviz_visual_tools::BLUE, rviz_visual_tools::XLARGE);
 
-                    if (tracker_poses_.size() == checkerboard_points_.size() ) {
-                        // Ceres NLS solver
-                        ceres::Problem ceres_problem;
-                        ceres::Solver::Options ceres_options;
-                        ceres::Solver::Summary ceres_summary;
+                //     if (tracker_poses_.size() == checkerboard_points_.size() ) {
+                //         // Ceres NLS solver
+                //         ceres::Problem ceres_problem;
+                //         ceres::Solver::Options ceres_options;
+                //         ceres::Solver::Summary ceres_summary;
 
-                        ceres_problem.AddParameterBlock(T_x.data(), Sophus::SE3d::num_parameters,
-                                                        new Sophus::test::LocalParameterizationSE3);
+                //         ceres_problem.AddParameterBlock(T_x.data(), Sophus::SE3d::num_parameters,
+                //                                         new Sophus::test::LocalParameterizationSE3);
 
-                        // Residual blocks
-                        for (int i = 0; i < tracker_poses_.size(); i++) {
-                            ceres::CostFunction* cost_function =
-                                new ceres::AutoDiffCostFunction<CheckerboardCostFunctor, 3, Sophus::SE3d::num_parameters>
-                                                                (new CheckerboardCostFunctor(tracker_poses_[i],
-                                                                                             checkerboard_points_[i]) );
-                            ceres_problem.AddResidualBlock(cost_function, NULL, T_x.data() );
-                        }
+                //         // Residual blocks
+                //         for (int i = 0; i < tracker_poses_.size(); i++) {
+                //             ceres::CostFunction* cost_function =
+                //                 new ceres::AutoDiffCostFunction<CheckerboardCostFunctor, 3, Sophus::SE3d::num_parameters>
+                //                                                 (new CheckerboardCostFunctor(tracker_poses_[i],
+                //                                                                              checkerboard_points_[i]) );
+                //             ceres_problem.AddResidualBlock(cost_function, NULL, T_x.data() );
+                //         }
 
-                        // Set solver options
-                        ceres_options.linear_solver_type = ceres::DENSE_SCHUR;
+                //         // Set solver options
+                //         ceres_options.linear_solver_type = ceres::DENSE_SCHUR;
 
-                        // Solve NLS problem
-                        Solve(ceres_options, &ceres_problem, &ceres_summary);
-                        ROS_INFO_STREAM(ceres_summary.FullReport() << std::endl);
+                //         // Solve NLS problem
+                //         Solve(ceres_options, &ceres_problem, &ceres_summary);
+                //         ROS_INFO_STREAM(ceres_summary.FullReport() << std::endl);
 
-                        tf_msg_tool_.transform = sophus_ros_conversions::sophusToTransformMsg(T_x.cast<float>() );
-                        tf_msg_tool_.header.stamp = ros::Time::now();
+                //         tf_msg_tool_.transform = sophus_ros_conversions::sophusToTransformMsg(T_x.cast<float>() );
+                //         tf_msg_tool_.header.stamp = ros::Time::now();
 
-                        static_tf_broadcaster_.sendTransform(tf_msg_tool_);
-                        ROS_INFO_STREAM(tf_msg_tool_);
-                    }
-                }
+                //         static_tf_broadcaster_.sendTransform(tf_msg_tool_);
+                //         ROS_INFO_STREAM(tf_msg_tool_);
+                //     }
+                // }
             } else {
                 ROS_WARN_STREAM("Can't transform from " + world_frame + " to " + tracker_frame + ": " + pError);
             }
         }
     }
 
-    if (msg_.buttons[0]) { // Menu button
-        if (state == STATE_SPHERE_POINTS) {
-            if (points_.size() >= 4) {
-                ROS_INFO_STREAM("Define checkerboard points");
-                state = STATE_CHECKERBOARD_POINTS;
-            }
-        }
-    }
+    // if (msg_.buttons[0]) { // Menu button
+    //     if (state == STATE_SPHERE_POINTS) {
+    //         if (points_.size() >= 4) {
+    //             ROS_INFO_STREAM("Define checkerboard points");
+    //             state = STATE_CHECKERBOARD_POINTS;
+    //         }
+    //     }
+    // }
 
     // if (msg_.buttons[3]) { // Trigger button
     //     joy_feedback_pub_.publish(joy_feedback_msg_);

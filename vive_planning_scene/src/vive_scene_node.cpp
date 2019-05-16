@@ -395,7 +395,7 @@ bool SceneNode::Init() {
         return false;
     }
 
-    ROS_INFO_STREAM("Using " + controller_frame + " for calibration");
+    ROS_INFO_STREAM("Using " + controller_frame + " and " + tracker_frame + " for calibration");
 
     // Subscribe to joy topic
     joy_sub_ = nh_.subscribe("/vive_node/joy/" + controller_frame, 1, &SceneNode::JoyCb, this);

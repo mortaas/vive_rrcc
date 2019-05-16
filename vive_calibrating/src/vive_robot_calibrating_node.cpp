@@ -46,7 +46,7 @@ bool CalibratingNode::InitParams() {
         pvt_nh_.param<std::string>("controller_frame",    controller_frame,      "") &&
         pvt_nh_.param<std::string>("base_frame",          base_frame,            "floor_base") &&
         pvt_nh_.param<std::string>("tool_frame",          tool_frame,            "floor_tool0") &&
-        pvt_nh_.param<std::string>("controller_FK_frame", controller_FK_frame,   "controller_FK") &&
+        pvt_nh_.param<std::string>("FK_sensor_frame",     FK_sensor_frame,   "controller_FK") &&
 
         // Random Pose Generator bounds
         pvt_nh_.getParam("radius_lower_bound",            radius_lower_bound) &&
@@ -118,15 +118,15 @@ bool CalibratingNode::Init() {
     }
 
     if ((!calibrate_flag && validate_flag) || soft_calibrate_flag ) {
-        if (!tf_buffer_.canTransform(controller_FK_frame, tool_frame, ros::Time(0),
+        if (!tf_buffer_.canTransform(FK_sensor_frame, tool_frame, ros::Time(0),
                                     ros::Duration(5.), &pError) )
         {
-            ROS_ERROR_STREAM("Can't transform from " + tool_frame + " to " + controller_FK_frame + ": " + pError);
+            ROS_ERROR_STREAM("Can't transform from " + tool_frame + " to " + FK_sensor_frame + ": " + pError);
 
             return false;
         } else {
-            tf_msg_X_ = tf_buffer_.lookupTransform(tool_frame, controller_FK_frame, ros::Time(0) );
-            tf_msg_X_inv_ = tf_buffer_.lookupTransform(controller_FK_frame, tool_frame, ros::Time(0) );
+            tf_msg_X_ = tf_buffer_.lookupTransform(tool_frame, FK_sensor_frame, ros::Time(0) );
+            tf_msg_X_inv_ = tf_buffer_.lookupTransform(FK_sensor_frame, tool_frame, ros::Time(0) );
 
             tf2::convert(tf_msg_X_.transform, tf_X_);
             tf2::convert(tf_msg_X_inv_.transform, tf_X_inv_);
@@ -344,14 +344,14 @@ void CalibratingNode::ExecuteTestPlans(std::vector<moveit::planning_interface::M
 
             // Check if necessary transforms are available
             std::string pError;
-            if (tf_buffer_.canTransform(controller_FK_frame, controller_frame, ros::Time(0), &pError) &&
-                tf_buffer_.canTransform(controller_FK_frame, world_frame, ros::Time(0), &pError) )
+            if (tf_buffer_.canTransform(FK_sensor_frame, controller_frame, ros::Time(0), &pError) &&
+                tf_buffer_.canTransform(FK_sensor_frame, world_frame, ros::Time(0), &pError) )
             {
                 // Lookup and convert necessary transforms from msgs
-                tf_msg_controller_difference_ = tf_buffer_.lookupTransform(controller_FK_frame, ros::Time(0), controller_frame, ros::Time(0), controller_FK_frame);
-                SampleSensor(controller_frame, controller_FK_frame, averaging_samples, sampling_frequency, tf_msg_controller_difference_);
+                tf_msg_controller_difference_ = tf_buffer_.lookupTransform(FK_sensor_frame, ros::Time(0), controller_frame, ros::Time(0), FK_sensor_frame);
+                SampleSensor(controller_frame, FK_sensor_frame, averaging_samples, sampling_frequency, tf_msg_controller_difference_);
 
-                tf_msg_sensor_ = tf_buffer_.lookupTransform(world_frame, ros::Time(0), controller_FK_frame, ros::Time(0), world_frame);
+                tf_msg_sensor_ = tf_buffer_.lookupTransform(world_frame, ros::Time(0), FK_sensor_frame, ros::Time(0), world_frame);
                 tf_msg_tool0_ = tf_buffer_.lookupTransform(world_frame, ros::Time(0), tool_frame, ros::Time(0), world_frame);
 
                 // Write sampled poses to bag file
@@ -571,7 +571,7 @@ void CalibratingNode::MeasureRobot(const int &N) {
     }
 
     // Wait for dynamics to settle down
-    ros::Duration(calibration_sleep_duration).sleep();
+    // ros::Duration(calibration_sleep_duration).sleep();
 
     // // Calibrate VIVE node
     // if (!(CalibrateViveNode() ) ) {
@@ -618,7 +618,7 @@ bool CalibratingNode::CalibrateViveNode() {
             tf_msg_X_ = compute_srv.response.X;
             tf_msg_X_.header.frame_id = tool_frame;
             tf_msg_X_.header.stamp = ros::Time::now();
-            tf_msg_X_.child_frame_id = controller_FK_frame;
+            tf_msg_X_.child_frame_id = FK_sensor_frame;
 
             // Write solution to bag file
             bag_.write("X", ros::Time::now(), tf_msg_X_);
@@ -632,7 +632,7 @@ bool CalibratingNode::CalibrateViveNode() {
                                                                          << tf_msg_X_.transform.rotation.y << " "
                                                                          << tf_msg_X_.transform.rotation.z << " "
                                                                          << tf_msg_X_.transform.rotation.w << " "
-                                                                         << tool_frame << " " << controller_FK_frame);
+                                                                         << tool_frame << " " << FK_sensor_frame);
 
             // Send solution to tf server
             static_tf_broadcaster_.sendTransform(tf_msg_X_);

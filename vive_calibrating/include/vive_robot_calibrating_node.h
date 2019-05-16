@@ -92,7 +92,7 @@ class CalibratingNode {
            theta_position_lower_bound,      theta_position_upper_bound,
            theta_orientation_lower_bound,   theta_orientation_upper_bound;
 
-    std::string planning_group, vr_frame, controller_frame, controller_FK_frame,
+    std::string planning_group, vr_frame, controller_frame, FK_sensor_frame,
                 base_frame, tool_frame, world_frame;
 
     bool InitParams();
