@@ -131,6 +131,7 @@ class ViveNode {
     bool looped_once;
     tf2::Transform tf_previous_poses_[MAX_TRACKED_DEVICES],
                    tf_difference_poses_[MAX_TRACKED_DEVICES];
+    geometry_msgs::Transform tf_msg_difference_pose_;
 
     // OpenVR interface
     ViveInterface vr_;

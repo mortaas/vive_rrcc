@@ -70,7 +70,7 @@ class CalibratingNode {
     geometry_msgs::TransformStamped tf_msg_, tf_msg_pose_;
 
     // Hand-eye transform msgs
-    geometry_msgs::TransformStamped tf_msg_A_, tf_msg_B_, tf_msg_X_, tf_msg_X_inv_;
+    geometry_msgs::TransformStamped tf_msg_A_, tf_msg_B_, tf_msg_X_, tf_msg_X_inv_, tf_msg_vr_offset_;
     // Sample transform msgs
     geometry_msgs::TransformStamped tf_msg_tool0_, tf_msg_sensor_, tf_msg_controller_difference_;
 
@@ -84,7 +84,8 @@ class CalibratingNode {
 
     double yaw_offset, pitch_offset, roll_offset;
 
-    double calibration_sleep_duration, sample_sleep_duration;
+    // double calibration_sleep_duration;
+    double sample_sleep_duration;
 
     double radius_lower_bound,              radius_upper_bound,
            phi_position_lower_bound,        phi_position_upper_bound,
@@ -113,7 +114,8 @@ class CalibratingNode {
     tf2_ros::TransformListener *tf_listener_;
 
     // Calibration transforms
-    tf2::Transform tf_tool0_[2], tf_sensor_[2];
+    // tf2::Transform tf_tool0_[2], tf_sensor_[2];
+    std::vector<tf2::Transform> tf_tool0_, tf_sensor_;
     tf2::Transform tf_X_, tf_X_inv_, tf_controller_, tf_vr_offset_;
     // General transforms
     tf2::Transform tf_pose_, tf_pose_offset_;
@@ -124,10 +126,10 @@ class CalibratingNode {
     bool SampleSensor(const std::string &target_frame, const std::string &source_frame,
                       const int &N, const int &F, geometry_msgs::TransformStamped &tf_msg_avg_);
 
-    std::vector<Eigen::Vector3d> eigen_translations_;
-    std::vector<Eigen::Quaterniond> eigen_rotations_;
+    std::vector<Eigen::Vector3d>    eigen_translations_, eigen_vr_offset_translations_;
+    std::vector<Eigen::Quaterniond> eigen_rotations_,    eigen_vr_offset_rotations_;
 
-    bool CalibrateViveNode();
+    bool CalibrateViveBridgeNode();
 
     void ParkMartinExample();
 

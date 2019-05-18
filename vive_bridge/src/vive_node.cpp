@@ -498,8 +498,19 @@ void ViveNode::Loop() {
                     // Lighthouse pose monitor
                     if (tf_difference_poses_[i].getOrigin().length() >= 1e-6 && looped_once)
                     {
+                        tf2::convert(tf_difference_poses_[i], tf_msg_difference_pose_);
                         ROS_WARN_STREAM("[LIGHTHOUSE MONITOR] Pose of " << devices_msg_.device_frames[i] <<
-                                        " has changed! \nTracked devices has likely also changed their pose.");
+                                        " has changed!\n" << tf_msg_difference_pose_ <<
+                                        "\nTracked devices has likely also changed their pose.");
+
+                        // Initial test implementation to auto-correct the calibration
+                        // tf_offset_ = tf_previous_poses_[i]*tf_offset_*tf_previous_poses_[i].inverse();
+                        // vr_x_offset = tf_offset_.getOrigin().getX();
+                        // vr_y_offset = tf_offset_.getOrigin().getY();
+                        // vr_z_offset = tf_offset_.getOrigin().getZ();
+                        // tf_offset_.getBasis().getRPY(vr_roll_offset, vr_pitch_offset, vr_yaw_offset);
+                        
+                        // SendOffsetTransform();
                     }
                 }
 

@@ -63,8 +63,12 @@ void SceneNode::JoyCb(const sensor_msgs::Joy& msg_) {
     if (msg_.axes[0] + msg_.axes[1] + msg_.axes[2] == 0.) {
         if (msg_.buttons[1]) { // Grip button
             points_.push_back(eigen_point_);
-            ROS_INFO_STREAM("Point " << points_.size() << ": \n" << eigen_point_.matrix() );
+            // ROS_INFO_STREAM("Point " << points_.size() << ": \n" << eigen_point_.matrix() );
+            ROS_INFO_STREAM("Point " << points_.size() << ": \n" << tf_msg_);
 
+            // Log point to bag file
+            bag_.write("scene_poses", ros::Time::now(), tf_msg_);
+            
             // Trigger controller haptic feedback
             joy_feedback_pub_.publish(joy_feedback_msg_);
 
@@ -75,7 +79,7 @@ void SceneNode::JoyCb(const sensor_msgs::Joy& msg_) {
                     rviz_infinite_tools_->trigger();
 
                     // Compute RPY-angles from transformation matrix
-                    rpy_angles_ = eigen_pose_.rotation().eulerAngles(2, 1, 0);
+                    rpy_angles_ = eigen_pose_.rotation().eulerAngles(0, 1, 2);
 
                     sdf_->AddBox(eigen_pose_.translation()[0], eigen_pose_.translation()[1], eigen_pose_.translation()[2],
                                  rpy_angles_[0], rpy_angles_[1], rpy_angles_[2],
@@ -395,8 +399,6 @@ bool SceneNode::Init() {
         return false;
     }
 
-    ROS_INFO_STREAM("Using " + controller_frame + " and " + tracker_frame + " for calibration");
-
     // Subscribe to joy topic
     joy_sub_ = nh_.subscribe("/vive_node/joy/" + controller_frame, 1, &SceneNode::JoyCb, this);
 
@@ -423,6 +425,8 @@ bool SceneNode::Init() {
         }
     }
 
+    ROS_INFO_STREAM("Using " + controller_frame + " as input, and " + tool_frame + " for calibration");
+
     joy_feedback_msg_.id = controller_id;
 
     // planning_scene_.is_diff = true;
@@ -433,6 +437,10 @@ bool SceneNode::Init() {
     // Infinite marker lifetime
     rviz_infinite_tools_->setLifetime(0.);
     rviz_infinite_tools_->setBaseFrame(world_frame);
+
+    // Open bag for logging poses
+    bag_.open("vive_scene_" + boost::posix_time::to_simple_string(ros::Time::now().toBoost() ) + ".bag",
+              rosbag::bagmode::Write);
     
     return true;
 }
@@ -571,6 +579,12 @@ void SceneNode::Shutdown() {
       /**
      * Runs before shutting down the node
      */
+
+    // Delete markers
+    rviz_infinite_tools_->deleteAllMarkers();
+
+    // Close bag file
+    bag_.close();
 
     // Write SDF tree to file
     sdf_->WriteSDF("scene");

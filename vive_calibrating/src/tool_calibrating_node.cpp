@@ -297,7 +297,7 @@ void ToolCalibratingNode::JoyCb(const sensor_msgs::Joy& msg_) {
                                                                                      << tf_msg_tool_.transform.rotation.y << " "
                                                                                      << tf_msg_tool_.transform.rotation.z << " "
                                                                                      << tf_msg_tool_.transform.rotation.w << " "
-                                                                                     << tool_frame << " " << tracker_frame);
+                                                                                     << tracker_frame << " " << tool_frame);
 
                         rviz_tools_->deleteAllMarkers();
                         rviz_tools_->publishSphere(eigen_c_, rviz_visual_tools::BLUE, 2*radius);

@@ -4,6 +4,7 @@
 
 // ROS
 #include <ros/ros.h>
+#include <rosbag/bag.h>
 // ROS msgs
 #include <vive_bridge/TrackedDevicesStamped.h>
 #include <sensor_msgs/JoyFeedback.h>
@@ -36,6 +37,9 @@
 #include "sophus_ros_conversions/eigen.hpp"
 #include "sophus_ros_conversions/geometry.hpp"
 
+// Boost
+#include <boost/date_time/posix_time/posix_time.hpp>
+
 
 // Handle signal [ctrl + c]
 bool sigint_flag = true;
@@ -65,6 +69,8 @@ enum E_DefineStates {
 class SceneNode {
     ros::NodeHandle nh_;
     ros::Rate loop_rate_;
+
+    rosbag::Bag bag_;
 
     // Publishers
     ros::Publisher joy_feedback_pub_;

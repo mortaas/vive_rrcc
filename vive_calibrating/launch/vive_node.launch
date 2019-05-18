@@ -26,9 +26,9 @@
     <arg name="stations"   default="10"/>
 
     <!-- Robot sleep duration before final calibration measurement -->
-    <arg name="cduration"   default="600."/>
+    <!-- <arg name="cduration"   default="600."/> -->
     <!-- Robot sleep duration before sampling poses -->
-    <arg name="sduration"   default="20."/>
+    <arg name="duration"   default="20."/>
 
 
     <!-- Launch the calibration node -->
@@ -47,8 +47,8 @@
         <param name="sampling_frequency"            value="$(arg frequency)"/>
         <param name="calibration_stations"          value="$(arg stations)"/>
 
-        <param name="calibration_sleep_duration"    value="$(arg cduration)"/>
-        <param name="sample_sleep_duration"         value="$(arg sduration)"/>
+        <!-- <param name="calibration_sleep_duration"    value="$(arg cduration)"/> -->
+        <param name="sample_sleep_duration"         value="$(arg duration)"/>
         
 
         <!-- Sphere sampling parameters for calibration -->

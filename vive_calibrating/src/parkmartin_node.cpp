@@ -224,11 +224,14 @@ bool ParkMartinNode::HoraudDornaika() {
                               new Sophus::test::LocalParameterizationSE3);
 
     for (int i = 0; i < n_samples; i++) {
+        // Define cost function from hand-eye functor with pair (A_i, B_i)
         ceres::CostFunction* cost_function =
-            new ceres::AutoDiffCostFunction<TestCostFunctor, Sophus::SE3d::DoF,
+            new ceres::AutoDiffCostFunction<TestCostFunctor,
+                                            Sophus::SE3d::DoF,
                                             Sophus::SE3d::num_parameters>
-                                           (new TestCostFunctor(sophus_Ta_[i].cast<double>(),
-                                                                sophus_Tb_[i].cast<double>() ) );
+            (new TestCostFunctor(sophus_Ta_[i].cast<double>(),
+                                 sophus_Tb_[i].cast<double>() ) );
+        // Add residual block
         problem.AddResidualBlock(cost_function, NULL, T_x.data() );
     }
 
