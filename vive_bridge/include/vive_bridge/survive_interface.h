@@ -1,13 +1,42 @@
 #pragma once
 
-#include <openvr.h>
-#include <boost/function.hpp>
-
 // STL
+#include <algorithm>
 #include <iostream>
+#include <iterator>
 #include <string>
 #include <vector>
-#include <map>
+#include <queue>
+
+// Boost
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/function.hpp>
+#include <boost/bind.hpp>
+
+// libsurvive
+#include <survive.h>
+#include <survive_api.h>
+
+
+// Maximum number of tracked devices to keep track of
+const unsigned char MAX_TRACKED_DEVICES = 8;
+
+struct TrackedDeviceData
+{
+    // Meta
+    std::string survive_name;
+    unsigned char device_class;
+    std::string serial_number;
+
+    // Pose and velocities
+	float pose[3][4];
+	float linear_vel[3];
+	float angular_vel[3];
+
+    // Controller input
+    unsigned long button_flags;
+    float axes[10];
+};
 
 
 // ROS logging
@@ -17,16 +46,18 @@ typedef boost::function<void(const std::string&)> WarnMsgCallback;
 typedef boost::function<void(const std::string&)> ErrorMsgCallback;
 typedef boost::function<void(const std::string&)> FatalMsgCallback;
 
-
 class ViveInterface {
-    // OpenVR
-    vr::IVRSystem *pHMD_;
-    vr::IVRTrackedCamera *pCamera_;
-    vr::VREvent_t event_;
-    vr::VRControllerState_t controller_state_;
-    vr::TrackedDevicePose_t device_poses_[vr::k_unMaxTrackedDeviceCount];
-    
-    std::string GetStringProperty(vr::TrackedDeviceIndex_t unDeviceIndex, vr::TrackedDeviceProperty prop, vr::TrackedPropertyError *pError);
+    // libsurvive
+    SurviveSimpleContext *actx_;
+
+    // Tracked device data
+    TrackedDeviceData tracked_devices_[MAX_TRACKED_DEVICES];
+
+    FLT pose[16];
+    SurvivePose survive_pose_;
+    SurviveVelocity survive_velocity_;
+
+    unsigned char SurviveClassToOpenVR(const std::string &device_name);
 
     // Callback functions for ROS logging
     DebugMsgCallback VR_DEBUG;
@@ -43,7 +74,7 @@ class ViveInterface {
         void Update();
         void Shutdown();
 
-        // OpenVR
+        // libsurvive
         bool PollNextEvent(unsigned int &event_type, unsigned int &device_index);
         void GetControllerState(const unsigned int &device_index, std::vector<float> &axes, std::vector<int> &buttons);
         void TriggerHapticPulse(const unsigned int &device_index, const unsigned short &duration);

@@ -9,6 +9,7 @@ add_compile_options(-std=c++11)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   roscpp
+  roslib
   std_msgs
   sensor_msgs
   geometry_msgs
@@ -57,6 +58,29 @@ find_library(OPENVR_LIBRARIES
   NO_CMAKE_FIND_ROOT_PATH
 )
 set(OPENVR_INCLUDE_DIR ${OPENVR}/headers)
+
+## Set libsurvive library path
+## ENV reads paths from a system environment variable
+set(SURVIVE "$ENV{HOME}/lib/libsurvive")
+
+## OpenVR SDK path
+find_library(SURVIVE_LIBRARIES
+  NAMES
+    ## Specify one or more possible names for the library
+    survive
+  PATHS
+    ## Specify directories to search in addition to the default locations
+    ${SURVIVE}/lib
+    ${SURVIVE}/lib/plugins
+  ## If NO_DEFAULT_PATH is specified, then no additional paths are added to the search
+  NO_DEFAULT_PATH
+  ## If NO_CMAKE_FIND_ROOT_PATH is used then CMAKE_FIND_ROOT_PATH will not be used
+  NO_CMAKE_FIND_ROOT_PATH
+)
+set(SURVIVE_INCLUDE_DIR ${SURVIVE}/include/libsurvive
+                        ${SURVIVE}/redist
+                        ${SURVIVE}/src)
+
 
 ################################################
 ## Declare ROS messages, services and actions ##
@@ -152,13 +176,16 @@ include_directories(
   include
   ${catkin_INCLUDE_DIRS}
   ${OPENVR_INCLUDE_DIR}
+  ${SURVIVE_INCLUDE_DIR}
 )
+link_directories(${SURVIVE}/lib)
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
 #   src/${PROJECT_NAME}/vive_bridge.cpp
 # )
 add_library(vive_interface src/vive_interface.cpp)
+add_library(survive_interface src/survive_interface.cpp)
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
@@ -168,9 +195,16 @@ add_library(vive_interface src/vive_interface.cpp)
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
+
+# OpenVR node
 add_executable(${PROJECT_NAME}_node 
   src/vive_node.cpp
   src/vive_interface.cpp
+)
+# libsurvive node
+add_executable(survive_bridge_node 
+  src/vive_node.cpp
+  src/survive_interface.cpp
 )
 
 ## Rename C++ executable without prefix
@@ -182,12 +216,20 @@ add_executable(${PROJECT_NAME}_node
 ## Add cmake target dependencies of the executable
 ## same as for the library above
 add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(survive_bridge_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(${PROJECT_NAME}_node
   ${catkin_LIBRARIES}
   ${OPENVR_LIBRARIES}
   vive_interface
+)
+target_link_libraries(survive_bridge_node
+  ${catkin_LIBRARIES}
+  ${OPENVR_LIBRARIES}
+  ${SURVIVE_LIBRARIES}
+  survive_interface
+  survive
 )
 
 #############

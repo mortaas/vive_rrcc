@@ -1,26 +1,27 @@
 #include "vive_robot_calibrating_node.h"
 
-CalibratingNode::CalibratingNode(int frequency)
-    : loop_rate_(frequency),
-      tf_listener_(new tf2_ros::TransformListener(tf_buffer_) ),
-      move_group_(moveit::planning_interface::MoveGroupInterface(PLANNING_GROUP) ),
-      robot_model_loader_(robot_model_loader::RobotModelLoader("/robot_description") ),
-      kinematic_model_(robot_model_loader_.getModel() ),
-      kinematic_state_(new robot_state::RobotState(kinematic_model_) ),
-      joint_model_group_(kinematic_model_->getJointModelGroup("floor_manipulator") ),
-      action_client_(new actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction>
-                    ("/floor/joint_trajectory_action", true) ),
-      rng(random_seed() ),
-      r_dist(1.2, 1.4),
-      theta_dist(5. * M_PI_4, 7. * M_PI_4),
-      phi_dist(M_PI_4, 1.5*M_PI_4)
-{
-    // Subscribers
-    device_sub_ = nh_.subscribe("/vive_node/tracked_devices", 1, &CalibratingNode::DevicesCb, this);
+// Handle signal [ctrl + c]
+bool sigint_flag = true;
 
+void IntHandler(int signal) {
+    sigint_flag = false;
+}
+
+
+/*
+   ROS node
+*/
+
+CalibratingNode::CalibratingNode(int frequency)
+    : pvt_nh_("~"),
+      loop_rate_(frequency),
+      tf_listener_(new tf2_ros::TransformListener(tf_buffer_) ),
+      rng1(random_seed1() ),
+      rng2(random_seed2() )
+{
     // Services
-    sample_client =  nh_.serviceClient<vive_calibrating::AddSample>("/vive_calibration/add_sample");
-    compute_client = nh_.serviceClient<vive_calibrating::ComputeCalibration>("/vive_calibration/compute_calibration");
+    sample_client =  nh_.serviceClient<vive_calibrating::AddSample>("/parkmartin_node/add_sample");
+    compute_client = nh_.serviceClient<vive_calibrating::ComputeCalibration>("/parkmartin_node/compute_calibration");
 
     // Define dynamic reconfigure message for calibrating frames
     srv_reconf_req_.config.doubles.resize(6);
@@ -30,11 +31,6 @@ CalibratingNode::CalibratingNode(int frequency)
     srv_reconf_req_.config.doubles[3].name = "vr_yaw_offset";
     srv_reconf_req_.config.doubles[4].name = "vr_pitch_offset";
     srv_reconf_req_.config.doubles[5].name = "vr_roll_offset";
-    
-    // Set planning parameters of the MoveIt! move group
-    move_group_.setPoseReferenceFrame("floor_base");
-    move_group_.setMaxVelocityScalingFactor(0.05);
-    move_group_.setMaxAccelerationScalingFactor(0.05);
 }
 CalibratingNode::~CalibratingNode() {
 }
@@ -42,12 +38,47 @@ CalibratingNode::~CalibratingNode() {
 bool CalibratingNode::InitParams() {
      /**
       * Initialize parameters from the parameter server.
-      * Returns true if the parameters were retrieved from the server, false otherwise.
+      * Returns true if all the parameters were retrieved from the server, false otherwise.
       */
 
-    if (nh_.param<std::string>("/vive_calibrating_node/controller", controller_frame, "") ) {
-        joy_sub_ = nh_.subscribe("/vive_node/joy/" + controller_frame, 1, &CalibratingNode::JoyCb, this);
+    if (pvt_nh_.param<std::string>("planning_group",     planning_group,        "floor_manipulator") &&
+
+        // Coordinate frames from VIVE bridge node
+        nh_.param<std::string>("/vive_node/vr_frame",    vr_frame,              "world_vr") &&
+        nh_.param<std::string>("/vive_node/world_frame", world_frame,           "root") &&
+
+        pvt_nh_.param<std::string>("controller_frame",    controller_frame,      "") &&
+        pvt_nh_.param<std::string>("base_frame",          base_frame,            "floor_base") &&
+        pvt_nh_.param<std::string>("tool_frame",          tool_frame,            "floor_tool0") &&
+        pvt_nh_.param<std::string>("FK_sensor_frame",     FK_sensor_frame,   "controller_FK") &&
+
+        // Random Pose Generator bounds
+        pvt_nh_.getParam("radius_lower_bound",            radius_lower_bound) &&
+        pvt_nh_.getParam("radius_upper_bound",            radius_upper_bound) &&
+        // Altitude position
+        pvt_nh_.getParam("phi_position_lower_bound",      phi_position_lower_bound) &&
+        pvt_nh_.getParam("phi_position_upper_bound",      phi_position_upper_bound) &&
+        // Altitude orientation
+        pvt_nh_.getParam("phi_orientation_lower_bound",   phi_orientation_lower_bound) &&
+        pvt_nh_.getParam("phi_orientation_upper_bound",   phi_orientation_upper_bound) &&
+        // Azimuth position
+        pvt_nh_.getParam("theta_position_lower_bound",    theta_position_lower_bound) &&
+        pvt_nh_.getParam("theta_position_upper_bound",    theta_position_upper_bound) &&
+        // Azimuth orientation
+        pvt_nh_.getParam("theta_orientation_lower_bound", theta_orientation_lower_bound) &&
+        pvt_nh_.getParam("theta_orientation_upper_bound", theta_orientation_upper_bound) &&
+
+        pvt_nh_.param("averaging_samples",               averaging_samples,           480) &&
+        pvt_nh_.param("sampling_frequency",              sampling_frequency,          30) &&
+        pvt_nh_.param("calibration_stations",            calibration_stations,        10) &&
         
+        // pvt_nh_.param("calibration_sleep_duration",      calibration_sleep_duration,  600.) &&
+        pvt_nh_.param("sample_sleep_duration",           sample_sleep_duration,       600.) &&
+
+        pvt_nh_.param("calibrate_flag",                  calibrate_flag,        true)  &&
+        pvt_nh_.param("soft_calibrate_flag",             soft_calibrate_flag,   false)  &&
+        pvt_nh_.param("validate_flag",                   validate_flag,         false) )
+    {
         return true;
     } else {
         ROS_WARN("Failed to get parameters from the parameter server.");
@@ -61,45 +92,130 @@ bool CalibratingNode::Init() {
      * Initialize the node and check if the necessary transforms are available
      */
 
-    // ParkMartinExample();
-    // return false;
+    if (!InitParams() ) {
+        if (controller_frame.empty() ) {
+            device_sub_ = nh_.subscribe("/vive_node/tracked_devices", 1, &CalibratingNode::DevicesCb, this);
 
-    // if (!InitParams() ) {
-    //     while (controller_frame.empty() ) {
-    //         ROS_INFO("Waiting for available VIVE controller..");
-            
-    //         ros::spinOnce();
-    //         ros::Duration(5.0).sleep();
-    //     }
-    // }
-    // ROS_INFO_STREAM("Using " + controller_frame + " for calibration");
+            while (controller_frame.empty() && sigint_flag) {
+                ROS_INFO("Waiting for available VIVE controller...");
+                
+                ros::spinOnce();
+                ros::Duration(5.).sleep();
+            }
 
-    // joy_sub_ = nh_.subscribe("/vive_node/joy/" + controller_frame, 1, &CalibratingNode::JoyCb, this);
+            // Handle SIGINT
+            if (!sigint_flag) {
+                return false;
+            }
+        }
+    }
+    ROS_INFO_STREAM("Using " + controller_frame + " for calibration");
 
-    // std::string pError;
-    // if (!tf_buffer_.canTransform("world_vr", controller_frame, ros::Time(0),
-    //                              ros::Duration(5.0), &pError) )
-    // {
-    //     ROS_ERROR_STREAM("Can't transform from world_vr to " + controller_frame + ": " + pError);
+    // Check if required coordinate frames are available from the tf server
+    std::string pError;
+    if (!tf_buffer_.canTransform(vr_frame, controller_frame, ros::Time(0),
+                                 ros::Duration(5.), &pError) )
+    {
+        ROS_ERROR_STREAM("Can't transform from " + vr_frame + " to " + controller_frame + ": " + pError);
 
-    //     return false;
-    // }
+        return false;
+    }
 
-    // Wait for action server
-    ROS_INFO("Waiting for FollowJointTrajectory action server...");
-    action_client_->waitForServer();
-    ROS_INFO("FollowJointTrajectory action server ready!");
+    if ((!calibrate_flag && validate_flag) || soft_calibrate_flag ) {
+        if (!tf_buffer_.canTransform(FK_sensor_frame, tool_frame, ros::Time(0),
+                                    ros::Duration(5.), &pError) )
+        {
+            ROS_ERROR_STREAM("Can't transform from " + tool_frame + " to " + FK_sensor_frame + ": " + pError);
 
-    // Initialize test transform
-    tf_X_.setOrigin(tf2::Vector3(2., -1., 0.5) );
-    tf_X_.setRotation(tf2::Quaternion(0., 0., std::sin(M_PI_4), std::cos(M_PI_4) ) );
+            return false;
+        } else {
+            tf_msg_X_ = tf_buffer_.lookupTransform(tool_frame, FK_sensor_frame, ros::Time(0) );
+            tf_msg_X_inv_ = tf_buffer_.lookupTransform(FK_sensor_frame, tool_frame, ros::Time(0) );
 
-    // Initialize transform frame ids
-    tf_msg_pose_.header.frame_id = "floor_base";
-    tf_msg_pose_.child_frame_id = "desired_pose";
-    pose_msg_.header.frame_id = "floor_base";
+            tf2::convert(tf_msg_X_.transform, tf_X_);
+            tf2::convert(tf_msg_X_inv_.transform, tf_X_inv_);
 
-    MeasureRobot(10);
+            if (soft_calibrate_flag) {
+                // Calibrate with known transformation from tool to sensor
+
+                // Lookup transformation from tool frame to world frame
+                tf_msg_ = tf_buffer_.lookupTransform(world_frame, ros::Time(0), tool_frame, ros::Time(0), world_frame);
+                tf2::fromMsg(tf_msg_.transform, tf_tool0_[1]);
+
+                if (SampleSensor(controller_frame, vr_frame, averaging_samples, sampling_frequency, tf_msg_) ) {
+                    // Convert current controller pose to transform
+                    tf2::fromMsg(tf_msg_.transform, tf_controller_);
+
+                    tf_vr_offset_ = tf_tool0_[1]*tf_X_*tf_controller_;
+
+                    // Set new offset parameters based on transformation
+                    srv_reconf_req_.config.doubles[0].value = tf_vr_offset_.getOrigin().getX();
+                    srv_reconf_req_.config.doubles[1].value = tf_vr_offset_.getOrigin().getY();
+                    srv_reconf_req_.config.doubles[2].value = tf_vr_offset_.getOrigin().getZ();
+                    // Orientation as RPY-angles
+                    tf_vr_offset_.getBasis().getRPY(roll_offset, pitch_offset, yaw_offset);
+                    srv_reconf_req_.config.doubles[3].value = yaw_offset;
+                    srv_reconf_req_.config.doubles[4].value = pitch_offset;
+                    srv_reconf_req_.config.doubles[5].value = roll_offset;
+
+                    // Send request to the dynamic reconfigure service in the VIVE bridge node
+                    ros::service::call("/vive_node/set_parameters", srv_reconf_req_, srv_reconf_resp_);
+
+                    return true;
+                }
+            }
+        }
+    }
+
+    // Initialize robot interface
+    robot_ = new RobotInterface(planning_group, base_frame);
+
+    // Parameter distributions for random poses
+    r_dist      = std::uniform_real_distribution<double>(radius_lower_bound, radius_upper_bound); // Radius
+    theta_dist1 = std::uniform_real_distribution<double>(theta_position_lower_bound, theta_position_upper_bound); // Azimuth position
+    phi_dist1   = std::uniform_real_distribution<double>(phi_position_lower_bound, phi_position_upper_bound); // Altitude position
+    theta_dist2 = std::uniform_real_distribution<double>(theta_orientation_lower_bound, theta_orientation_upper_bound); // Azimuth orientation
+    phi_dist2   = std::uniform_real_distribution<double>(phi_orientation_lower_bound, phi_orientation_upper_bound); // Altitude orientation
+
+    // Initialize message headers
+    // tf_msg_pose_.header.frame_id = base_frame;
+    // tf_msg_pose_.child_frame_id = tool_frame + "_desired";
+
+    pose_msg_.header.frame_id = base_frame;
+    robot_->GetCurrentPose(home_pose_msg_);
+
+    // robot_->SetPoseTarget(home_pose_msg_);
+    // robot_->MoveIt();
+
+    if (calibrate_flag) {
+        MeasureRobot(calibration_stations);
+    }
+
+    if (validate_flag && sigint_flag) {
+        // Preplan robot trajectories
+        // FillTestPlanePlans(test_plans_, base_frame, 1., 3., 3, 6, 1., 0., 0.5, false);
+        // FillTestPlanePlans(test_plans_, base_frame, 1., 3., 3, 6, 1., 0., 1. ,  true);
+        // FillTestPlanePlans(test_plans_, base_frame, 1., 3., 3, 6, 1., 0., 1.5, false);
+
+        FillTestPlanePlans(test_plans_, world_frame, 1., 2., 3, 6, 1.25, 0., 1.5, false);
+        // FillTestPlanePlans(test_plans_, world_frame, 1., 3., 3, 6, 0.5, 0., 2. ,  true);
+        // FillTestPlanePlans(test_plans_, world_frame, 3., 1., 6, 3, -0.5, 0., 2.5, false);
+
+        // Preplan last trajectory to home pose
+        robot_->SetPoseTarget(home_pose_msg_);
+        if (robot_->GetPlan(plan_) ) {
+            test_plans_.push_back(plan_);
+        }
+
+        // Set robot state to current state
+        robot_->SetStartStateToCurrentState();
+
+        // Execute preplanned trajectories until canceled by user
+        while (sigint_flag) {
+            ExecuteTestPlans(test_plans_);
+        }
+    }
+
     return true;
 }
 
@@ -116,19 +232,7 @@ void CalibratingNode::Shutdown() {
      * Runs before shutting down the node
      */
 
-    
-}
-
-
-void CalibratingNode::JoyCb(const sensor_msgs::Joy& msg_) {
-      /**
-     * Handle VIVE Controller inputs
-     */
-
-    // Grip button - Runs a calibration routine with measurements from the robot
-    // if (msg_.buttons[1]) {
-    //     MeasureRobot(50);
-    // }
+    ros::shutdown();
 }
 
 void CalibratingNode::DevicesCb(const vive_bridge::TrackedDevicesStamped& msg_) {
@@ -138,25 +242,158 @@ void CalibratingNode::DevicesCb(const vive_bridge::TrackedDevicesStamped& msg_) 
 
     for (int i = 0; i < msg_.device_count; i++) {
         if (msg_.device_classes[i] == msg_.CONTROLLER) {
-            controller_frame = msg_.device_frames[i];
+            if (controller_frame.empty() ) {
+                controller_frame = msg_.device_frames[i];
+            }
         }
     }
 }
 
 
-geometry_msgs::Pose CalibratingNode::SphereNormalPose(double r, double theta, double phi, geometry_msgs::Pose &pose_) {
+/*
+    Functions for generating poses of point lattice
+*/
+
+void CalibratingNode::FillTestPlanePlans(std::vector<moveit::planning_interface::MoveGroupInterface::Plan> &plans_, std::string frame_id, 
+                                         double L, double W, int n, int m, double x_offset, double y_offset, double z_offset, bool reverse_order)
+{
       /**
-     * Find pose based on normal vector of sphere with radius r, polar angle theta and azimuthal angle phi
+     * Fills a vector of plans with trajectories to sample a point lattice of length L and width W,
+     * which is a segmented plane of m x n segments. The points are offset by {x_offset, y_offset, z_offset},
+     * and reverse order returns the lattice points in opposite order.
+     * The poses are given with respect to frame_id, and they are oriented such that the robot is facing the point.
      */
 
-    tf2::Transform tf_rot_ = tf2::Transform(tf2::Quaternion(0., 0., std::sin(-M_PI/8), std::cos(-M_PI/8) ),
-                                            tf2::Vector3(0., 0., 0.) );
+    // Segment length and width
+    const double h_L = L/n;
+    const double h_W = W/m;
+    // Plane center point
+    const double L_2 = L/2.;
+    const double W_2 = W/2.;
+
+    // Resize vector of plans to accomondate new plans
+    const std::size_t plans_sz = plans_.size();
+    plans_.resize(plans_sz + n*(m + 1) + m + 1);
+
+    // Number of failed plans
+    int n_failed_plans = 0;
+    // Direction
+    int dir = 1;
+    // Reverse order
+    int rev = 1 - 2*((int) reverse_order);
+
+    // Work pose
+    geometry_msgs::PoseStamped planned_pose_;
+    planned_pose_.header.frame_id = frame_id;
+
+    // Sample lattice point as plan with trajectory to pose
+    for (int i = 0; i <= n; i++) {
+        for (int j = 0; j <= m; j++) {
+            // Define lattice point as pose
+            tf_pose_.setOrigin(tf2::Vector3(-x_offset + rev*(     h_L*i - L_2 ),
+                                             y_offset + rev*(dir*(h_W*j - W_2)),
+                                             z_offset) );
+            // tf_pose_.setRotation(tf2::Quaternion(1., 0., 0., 0.) );
+            tf_pose_.setRotation(tf2::Quaternion(0., -1., 0., 0.) );
+
+            // Rotate the pose such that the robot is facing its position
+            const double offset_angle = atan2(-tf_pose_.getOrigin().getY(), tf_pose_.getOrigin().getX() );
+            tf_pose_offset_.setRotation(tf2::Quaternion(0., 0., std::sin(-offset_angle/2),
+                                                                std::cos(-offset_angle/2) ) );
+
+            // tf2::toMsg((tf_pose_).inverseTimes(tf_pose_offset_*tf_X_inv_), planned_pose_.pose);
+            tf2::toMsg((tf_pose_).inverseTimes(tf_X_inv_), planned_pose_.pose);
+            planned_pose_.header.stamp = ros::Time::now();
+
+            // Plan trajectory to pose
+            robot_->SetPoseTarget(planned_pose_);
+            if (!robot_->GetPlan(plans_[plans_sz + i*(m + 1) + j - n_failed_plans]) ) {
+                ROS_WARN_STREAM("Failed planning trajectory to pose:\n" << planned_pose_);
+
+                // Delete last plan element if the current plan failed
+                plans_.pop_back();
+                n_failed_plans++;
+            }
+        }
+
+        // Reverse y-direction
+        dir *= -1;
+    }
+}
+
+void CalibratingNode::ExecuteTestPlans(std::vector<moveit::planning_interface::MoveGroupInterface::Plan> &plans_) {
+      /**
+     * Execute MoveIt! plans and sample pose difference of VIVE controller and FK from calibration.
+     */
+
+    // Open a bag file for recording poses (named with iso-date)
+    bag_.open("vive_verification_" + boost::posix_time::to_simple_string(ros::Time::now().toBoost() ) + ".bag",
+              rosbag::bagmode::Write);
+    bag_.write("X", ros::Time::now(), tf_msg_X_);
+
+    // Number of plans to execute
+    const int N = plans_.size();
+
+    for (std::vector<moveit::planning_interface::MoveGroupInterface::Plan>::iterator it_ = plans_.begin();
+                                                                                     it_ != plans_.end(); ++it_)
+    {
+        // Element index of plan vector
+        ptrdiff_t i = std::distance(plans_.begin(), it_) + 1;
+        // Print current progress on executed plans to console
+        ROS_INFO_STREAM(i << "/" << N);
+        
+        if (robot_->ExecutePlan(*it_) ) {
+            // Handle SIGINT
+            if (!sigint_flag) {
+                break;
+            }
+
+            // Wait for dynamics to settle down before sampling
+            ros::Duration(sample_sleep_duration).sleep();
+
+            // Check if necessary transforms are available
+            std::string pError;
+            if (tf_buffer_.canTransform(FK_sensor_frame, controller_frame, ros::Time(0), &pError) &&
+                tf_buffer_.canTransform(FK_sensor_frame, world_frame, ros::Time(0), &pError) )
+            {
+                // Lookup and convert necessary transforms from msgs
+                tf_msg_controller_difference_ = tf_buffer_.lookupTransform(FK_sensor_frame, ros::Time(0), controller_frame, ros::Time(0), FK_sensor_frame);
+                SampleSensor(controller_frame, FK_sensor_frame, averaging_samples, sampling_frequency, tf_msg_controller_difference_);
+
+                tf_msg_sensor_ = tf_buffer_.lookupTransform(world_frame, ros::Time(0), FK_sensor_frame, ros::Time(0), world_frame);
+                tf_msg_tool0_ = tf_buffer_.lookupTransform(world_frame, ros::Time(0), tool_frame, ros::Time(0), world_frame);
+
+                // Write sampled poses to bag file
+                bag_.write("tool0", ros::Time::now(), tf_msg_tool0_);
+                bag_.write("FK_sensor", ros::Time::now(), tf_msg_sensor_);
+                bag_.write("FK_diff", ros::Time::now(), tf_msg_controller_difference_);
+            } else {
+                ROS_WARN_STREAM(pError);
+            }
+        }
+    }
+
+    bag_.close();
+}
+
+
+/*
+    Functions for generating random sphere poses for calibration procedure
+*/
+
+geometry_msgs::Pose CalibratingNode::SphereNormalPose(double r, double theta, double phi, geometry_msgs::Pose &pose_) {
+      /**
+     * Generate pose based on normal vector of sphere with radius r, azimuthal angle theta and altitude angle phi
+     */
+
+    // tf2::Transform tf_rot_ = tf2::Transform(tf2::Quaternion(0., 0., std::sin(-M_PI/8), std::cos(-M_PI/8) ),
+    //                                         tf2::Vector3(0., 0., 0.) );
 
     tf2::Matrix3x3 tf_rotmat_;
     tf_rotmat_.setEulerYPR(theta, phi, 0.);
 
     tf2::Transform tf_pose_(tf_rotmat_, r * (tf_rotmat_ * tf2::Vector3(0., 0., 1.) ) );
-    tf_pose_ *= tf_rot_;
+    // tf_pose_ *= tf_rot_;
 
     tf2::toMsg(tf_pose_, pose_);
 
@@ -170,8 +407,8 @@ geometry_msgs::Pose CalibratingNode::GenerateRandomPose(geometry_msgs::Pose &pos
       */
 
     geometry_msgs::Pose pose_pos_;
-    SphereNormalPose(r_dist(rng), theta_dist(rng), phi_dist(rng), pose_pos_ );
-    SphereNormalPose(r_dist(rng), theta_dist(rng), phi_dist(rng), pose_ );
+    SphereNormalPose(r_dist(rng1), theta_dist1(rng1), phi_dist1(rng1), pose_pos_ );
+    SphereNormalPose(r_dist(rng2), theta_dist2(rng2), phi_dist2(rng2), pose_ );
     
     // Set position from the first random pose
     pose_.position = pose_pos_.position;
@@ -180,73 +417,47 @@ geometry_msgs::Pose CalibratingNode::GenerateRandomPose(geometry_msgs::Pose &pos
 }
 
 
-void GenerateJointTrajectorySine(trajectory_msgs::JointTrajectory traj_msg_, std::vector<double> positions0,
-                                 int joint, int sampling_frequency, double amplitude, double frequency, int periods)
+/*
+    Functions for sampling sensor poses and calibrating vive_bridge node with robot
+*/
+
+bool CalibratingNode::SampleSensor(const std::string &target_frame, const std::string &source_frame,
+                                   const int &N, const int &F, geometry_msgs::TransformStamped &tf_msg_avg_)
 {
-    traj_msg_.points.resize(int(sampling_frequency/frequency*periods) );
+      /**
+     * Sample and average N number of transforms from source_frame to target_frame.
+     * The transforms are sampled with provided sample rate F, and the resulting average is returned as tf_msg_avg_.
+     */
 
-    for (int i = 0; i < sampling_frequency/frequency*periods; i++) {
-        traj_msg_.points[i].positions = positions0;
-        traj_msg_.points[i].positions[joint] += std::sin(frequency/10*i);
+    if (tf_buffer_.canTransform(target_frame, source_frame, ros::Time(0) ) ) {
+        // Define sample rate
+        ros::Rate sample_rate_(F);
 
-        traj_msg_.points[i].velocities = {0., 0., 0., 0., 0., 0.};
-        traj_msg_.points[i].velocities[joint] += frequency*std::cos(frequency/10*i);
+        // Resize vectors to number of samples
+        eigen_translations_.resize(N);
+        eigen_rotations_.resize(N);
 
-        traj_msg_.points[i].accelerations = {0., 0., 0., 0., 0., 0.};
-        traj_msg_.points[i].accelerations[joint] += -frequency*frequency*std::sin(frequency/10*i);
-    }
-}
+        // Sample N sensor poses with provided sample rate F
+        for (int i = 0; i < N; i++) {
+            tf_msg_sensor_ = tf_buffer_.lookupTransform(target_frame, ros::Time(0), source_frame, ros::Time(0), target_frame);
 
-bool CalibratingNode::GetJointPositionsFromIK(const geometry_msgs::PoseStamped &pose_, std::vector<double> joint_values) {
-    geometry_msgs::TransformStamped tf_root_ = tf_buffer_.lookupTransform("root", pose_.header.frame_id, ros::Time(0) );
-    geometry_msgs::PoseStamped pose_root_;
-    tf2::doTransform(pose_, pose_root_, tf_root_);
+            // Convert to Eigen
+            tf2::fromMsg(tf_msg_sensor_.transform.translation, eigen_translations_[i]);
+            tf2::fromMsg(tf_msg_sensor_.transform.rotation,       eigen_rotations_[i]);
 
-    
-}
+            sample_rate_.sleep();
+        }
 
-bool CalibratingNode::MoveRobot(const geometry_msgs::PoseStamped &pose_) {
-     /**
-      * Move robot to provided pose, stop, and wait for the dynamics to settle down.
-      * Returns true if trajectory execution succeeded.
-      */
-    
-    geometry_msgs::TransformStamped tf_root_ = tf_buffer_.lookupTransform("root", pose_.header.frame_id, ros::Time(0) );
-    geometry_msgs::PoseStamped pose_root_;
-    tf2::doTransform(pose_, pose_root_, tf_root_);
-    
-    if (kinematic_state_->setFromIK(joint_model_group_, pose_root_.pose, 10, 0.1) ) {
-        std::vector<double> joint_values;
-        kinematic_state_->copyJointGroupPositions(joint_model_group_, joint_values);
-        const std::vector<std::string>& joint_names = joint_model_group_->getVariableNames();
+        // Return averaged pose as transform msg
+        geometry_msgs::Point tf_translation_ = tf2::toMsg(dr::averagePositions<double>(eigen_translations_) );
+        tf_msg_avg_.transform.translation.x = tf_translation_.x;
+        tf_msg_avg_.transform.translation.y = tf_translation_.y;
+        tf_msg_avg_.transform.translation.z = tf_translation_.z;
+        tf_msg_avg_.transform.rotation = tf2::toMsg(dr::averageQuaternions<double>(eigen_rotations_) );
 
-        control_msgs::FollowJointTrajectoryGoal traj_goal_msg_;
-        traj_goal_msg_.trajectory.header.frame_id = pose_.header.frame_id;
-        traj_goal_msg_.trajectory.joint_names = joint_names;
-        traj_goal_msg_.trajectory.points.push_back(trajectory_msgs::JointTrajectoryPoint() );
-        traj_goal_msg_.trajectory.points[0].positions = joint_values;
-        traj_goal_msg_.trajectory.points[0].velocities = {0., 0., 0., 0., 0., 0.};
-        traj_goal_msg_.trajectory.points[0].accelerations = {0., 0., 0., 0., 0., 0.};
-        traj_goal_msg_.trajectory.points[0].time_from_start = ros::Duration(10.);
-
-        action_client_->sendGoalAndWait(traj_goal_msg_);
-
-        // move_group_.setPoseTarget(pose_);
-
-        // if (move_group_.move() ) {
-        //     ROS_INFO_STREAM("Trajectory execution succeeded");
-
-        //     move_group_.stop();
-        //     ros::Duration(0.5).sleep();
-        //     return true;
-        // } else {
-        //     ROS_WARN_STREAM("Trajectory execution failed with pose:" << std::endl
-        //                                                             << pose_.pose);
-
-        //     return false;
-        // }
+        return true;
     } else {
-        ROS_INFO("Unable to find IK solution");
+        return false;
     }
 }
 
@@ -265,96 +476,275 @@ void CalibratingNode::MeasureRobot(const int &N) {
       */
 
     // Open a bag file for recording poses (named with iso-date)
-    bag_.open("calib_data_" + boost::posix_time::to_iso_string(ros::Time::now().toBoost() ) + ".bag",
+    bag_.open("vive_calibration_" + boost::posix_time::to_simple_string(ros::Time::now().toBoost() ) + ".bag",
               rosbag::bagmode::Write);
 
-    ros::Duration(3.).sleep();
+    // Get transform from base to root
+    geometry_msgs::TransformStamped tf_msg_base_root_ = tf_buffer_.lookupTransform(world_frame, base_frame, ros::Time(0) );
 
-    GenerateRandomPose(pose_msg_.pose);
-    pose_msg_.header.stamp = ros::Time::now();
-    bag_.write("desired_pose", ros::Time::now(), pose_msg_);
 
-    ROS_INFO_STREAM("0/" << N << " Moving robot to pose:" << std::endl << pose_msg_.pose);
-    MoveRobot(pose_msg_);
+    // Preplan robot trajectories with random sphere poses
+    calibration_plans_.resize(N + 1);
+    for (int i = 0; i <= N; i++) {
+        // Handle SIGINT
+        if (!sigint_flag) {
+            break;
+        }
 
-    std::string pError;
-    if (tf_buffer_.canTransform("floor_tool0", "floor_base", ros::Time(0), &pError) ) // &&
-        // tf_buffer_.canTransform(controller_frame, "world_vr", ros::Time(0), &pError) )
+        // Generate randomized pose from uniform distribution
+        GenerateRandomPose(pose_msg_.pose);
+        pose_msg_.header.stamp = ros::Time::now();
+
+        // Transform pose from base to root
+        tf2::doTransform(pose_msg_, pose_msg_, tf_msg_base_root_);
+
+        // Plan trajectory to randomized pose
+        robot_->SetPoseTarget(pose_msg_);
+        if (!(robot_->GetPlan(calibration_plans_[i]) ) ) {
+            i--;
+        }
+    }
+
+    tf_tool0_.resize(N + 2);
+    tf_sensor_.resize(N + 2);
+
+    // Print current progress on executed plans to console
+    ROS_INFO_STREAM("0/" << N << ":");
+
+    if (robot_->ExecutePlan(calibration_plans_[0] ) )
     {
-        // Lookup and convert necessary transforms from msgs
-        tf_msg_tool0_ = tf_buffer_.lookupTransform("floor_base", ros::Time(0), "floor_tool0", ros::Time(0), "floor_base");
-        // tf_msg_sensor_ = tf_buffer_.lookupTransform("world_vr", ros::Time(0), controller_frame, ros::Time(0), "world_vr");
-        bag_.write("tool0", ros::Time::now(), tf_msg_tool0_);
-        bag_.write("sensor", ros::Time::now(), tf_msg_sensor_);
+        // Wait for dynamics to settle down before sampling
+        ros::Duration(sample_sleep_duration).sleep();
 
-        tf2::convert(tf_msg_tool0_.transform, tf_tool0_[0]);
-        // tf2::convert(tf_msg_sensor_.transform, tf_sensor_[0]);
-        tf_sensor_[0] = tf_tool0_[0]*tf_X_;
+        // Check if necessary transforms are available
+        std::string pError;
+        if (tf_buffer_.canTransform(tool_frame, world_frame, ros::Time(0), &pError) &&
+            tf_buffer_.canTransform(vr_frame, controller_frame, ros::Time(0), &pError) )
+        {
+            // Lookup and convert necessary transforms from msgs
+            tf_msg_tool0_ = tf_buffer_.lookupTransform(world_frame, ros::Time(0), tool_frame, ros::Time(0), world_frame);
+            SampleSensor(vr_frame, controller_frame, averaging_samples, sampling_frequency, tf_msg_sensor_);
 
-        for (int i = 1; i <= N; i++) {
-            GenerateRandomPose(pose_msg_.pose);
-            pose_msg_.header.stamp = ros::Time::now();
-            bag_.write("desired_pose", ros::Time::now(), pose_msg_);
+            bag_.write("tool0", ros::Time::now(), tf_msg_tool0_);
+            bag_.write("sensor", ros::Time::now(), tf_msg_sensor_);
 
-            // Visualize desired pose as a transform in RViz
-            tf2::convert(pose_msg_.pose, tf_pose_);
-            tf2::convert(tf_pose_, tf_msg_pose_.transform);
-            tf_msg_pose_.header.stamp = ros::Time::now();
-            static_tf_broadcaster_.sendTransform(tf_msg_pose_);
+            // Write sampled poses to bag file
+            tf2::convert(tf_msg_tool0_.transform, tf_tool0_[0]);
+            tf2::convert(tf_msg_sensor_.transform, tf_sensor_[0]);
 
-            ROS_INFO_STREAM(i << "/" << N << " Moving robot to pose:" << std::endl << pose_msg_.pose);
-            if (MoveRobot(pose_msg_) ) {
-                if (tf_buffer_.canTransform("floor_tool0", "floor_base", ros::Time(0), &pError) )//&&
-                    //tf_buffer_.canTransform(controller_frame, "world_vr", ros::Time(0), &pError) )
-                {
-                    // Lookup and convert necessary transforms
-                    tf_msg_tool0_ = tf_buffer_.lookupTransform("floor_base", ros::Time(0), "floor_tool0", ros::Time(0), "floor_base");
-                    // tf_msg_sensor_ = tf_buffer_.lookupTransform("world_vr", ros::Time(0), controller_frame, ros::Time(0), "world_vr");
-                    bag_.write("tool0", ros::Time::now(), tf_msg_tool0_);
-                    bag_.write("sensor", ros::Time::now(), tf_msg_sensor_);
+            for (std::vector<moveit::planning_interface::MoveGroupInterface::Plan>::iterator it_ = calibration_plans_.begin() + 1;
+                                                                                             it_ != calibration_plans_.end(); ++it_)
+            {
+                // Handle SIGINT
+                if (!sigint_flag) {
+                    break;
+                }
 
-                    tf2::convert(tf_msg_tool0_.transform, tf_tool0_[1]);
-                    // tf2::convert(tf_msg_sensor_.transform, tf_sensor_[1]);
-                    tf_sensor_[1] = tf_tool0_[1]*tf_X_;
+                // Element index of plan vector
+                ptrdiff_t i = std::distance(calibration_plans_.begin(), it_);
+                // Print current progress on executed plans to console
+                ROS_INFO_STREAM(i << "/" << N << ":");
 
-                    // Compute transforms between poses
-                    tf2::convert(tf_tool0_[0].inverseTimes(tf_tool0_[1]), tf_msg_A_.transform);
-                    tf2::convert(tf_sensor_[0].inverseTimes(tf_sensor_[1]), tf_msg_B_.transform);
-                    bag_.write("A", ros::Time::now(), tf_msg_A_);
-                    bag_.write("B", ros::Time::now(), tf_msg_B_);
+                if (robot_->ExecutePlan(*it_) ) {
+                    // Wait for dynamics to settle down
+                    ros::Duration(sample_sleep_duration).sleep();
 
-                    // Sample pair (A, B)
-                    vive_calibrating::AddSample sample_srv;
-                    sample_srv.request.A = tf_msg_A_;
-                    sample_srv.request.B = tf_msg_B_;
-                    if (sample_client.call(sample_srv) ) {
-                        ROS_INFO_STREAM("Sampled " << sample_srv.response.n << " pairs (A, B)");
+                    if (tf_buffer_.canTransform(world_frame, tool_frame, ros::Time(0), &pError) &&
+                        tf_buffer_.canTransform(vr_frame, controller_frame, ros::Time(0), &pError) )
+                    {
+                        // Lookup and convert necessary transforms
+                        tf_msg_tool0_ = tf_buffer_.lookupTransform(world_frame, ros::Time(0), tool_frame, ros::Time(0), world_frame);
+                        SampleSensor(vr_frame, controller_frame, averaging_samples, sampling_frequency, tf_msg_sensor_);
+
+                        // Write sampled poses to bag file
+                        bag_.write( "tool0", ros::Time::now(),  tf_msg_tool0_);
+                        bag_.write("sensor", ros::Time::now(), tf_msg_sensor_);
+
+                        // tf2::convert(tf_msg_tool0_.transform, tf_tool0_[1]);
+                        // tf2::convert(tf_msg_sensor_.transform, tf_sensor_[1]);
+
+                        tf2::convert( tf_msg_tool0_.transform,  tf_tool0_[i]);
+                        tf2::convert(tf_msg_sensor_.transform, tf_sensor_[i]);
+
+                        // Compute transforms between poses
+                        // tf2::convert(tf_tool0_[0].inverseTimes(tf_tool0_[1]), tf_msg_A_.transform);
+                        // tf2::convert(tf_sensor_[0].inverseTimes(tf_sensor_[1]), tf_msg_B_.transform);
+
+                        tf2::convert( tf_tool0_[i - 1].inverseTimes( tf_tool0_[1]), tf_msg_A_.transform);
+                        tf2::convert(tf_sensor_[i - 1].inverseTimes(tf_sensor_[1]), tf_msg_B_.transform);
+
+                        // Write stations to bag file
+                        bag_.write("A", ros::Time::now(), tf_msg_A_);
+                        bag_.write("B", ros::Time::now(), tf_msg_B_);
+
+                        // Sample transformation pair (A, B)
+                        sample_srv.request.A = tf_msg_A_;
+                        sample_srv.request.B = tf_msg_B_;
+                        if (sample_client.call(sample_srv) ) {
+                            ROS_INFO_STREAM("Sampled " << sample_srv.response.n << " pairs (A, B)");
+                        }
+
+                        // Set the current pose as a reference for next pose
+                        // tf_tool0_[0]  = tf_tool0_[1];
+                        // tf_sensor_[0] = tf_sensor_[1];
+                    } else {
+                        // Print error and current progress on executed plans to console
+                        ROS_WARN_STREAM("0/" << N << ": " << pError);
                     }
-
-                    // Set current pose as reference for next pose
-                    tf_tool0_[0]  = tf_tool0_[1];
-                    tf_sensor_[0] = tf_sensor_[1];
-                } else {
-                    ROS_WARN_STREAM("0/" << N << ": " << pError);
                 }
             }
+        } else {
+            // Print error and current progress on executed plans to console
+            ROS_WARN_STREAM("0/" << N << ": " << pError);
         }
-    } else {
-        ROS_WARN_STREAM("0/" << N << ": " << pError);
     }
 
-    vive_calibrating::ComputeCalibration compute_srv;
-    if (compute_client.call(compute_srv) ) {
-        if (compute_srv.response.success) {
-            geometry_msgs::TransformStamped tf_msg_Tx_ = compute_srv.response.X;
-            ROS_INFO_STREAM(tf_msg_Tx_);
-            bag_.write("X", ros::Time::now(), tf_msg_Tx_);
-        } else {
-            ROS_ERROR("Failed solving the provided AX=XB problem");
-        }
+
+    // Wait for dynamics to settle down
+    // ros::Duration(calibration_sleep_duration).sleep();
+
+    // // Calibrate VIVE node
+    // if (!(CalibrateViveBridgeNode() ) ) {
+    //     ROS_ERROR("Failed solving the provided AX=XB problem");
+    // }
+
+    // tf_pose_.setOrigin(tf2::Vector3(-1., 0., 1.) );
+    // tf_pose_.setRotation(tf2::Quaternion(1., 0., 0., 0.) );
+
+    // // Rotate the pose such that the robot is facing its position
+    // double offset_angle = atan2(-tf_pose_.getOrigin().getY(), tf_pose_.getOrigin().getX() );
+    // tf_pose_offset_.setRotation(tf2::Quaternion(0., 0., std::sin(-offset_angle/2),
+    //                                                     std::cos(-offset_angle/2) ) );
+
+    // tf2::toMsg((tf_pose_).inverseTimes(tf_pose_offset_*tf_X_inv_), home_pose_msg_.pose);
+    // home_pose_msg_.header.stamp = ros::Time::now();
+    // home_pose_msg_.header.frame_id = base_frame;
+
+
+    // robot_->SetPoseTarget(home_pose_msg_);
+    // robot_->MoveIt();
+
+    // Wait for dynamics to settle down
+    // ros::Duration(calibration_sleep_duration).sleep();
+
+
+    if (!(CalibrateViveBridgeNode() ) ) {
+        ROS_ERROR("Failed solving the provided AX=XB problem");
     }
+
+    bag_.write("tool0", ros::Time::now(), tf_msg_tool0_);
+    bag_.write("sensor", ros::Time::now(), tf_msg_sensor_);
 
     bag_.close();
+}
+
+bool CalibratingNode::CalibrateViveBridgeNode() {
+      /**
+     * Calibrate VIVE node by calling the ParkMartin compute service,
+     * and update the VIVE node parameters using dynamic reconfigure
+     */
+
+    if (compute_client.call(compute_srv) ) {
+        if (compute_srv.response.success) {
+            // Define hand-eye solution as a transform msg
+            tf_msg_X_ = compute_srv.response.X;
+            tf_msg_X_.header.frame_id = tool_frame;
+            tf_msg_X_.header.stamp = ros::Time::now();
+            tf_msg_X_.child_frame_id = FK_sensor_frame;
+
+            // Write solution to bag file
+            bag_.write("X", ros::Time::now(), tf_msg_X_);
+
+            // Print solution to console as a command for sending transform to tf tree
+            ROS_INFO_STREAM(tf_msg_X_);
+            ROS_INFO_STREAM("rosrun tf2_ros static_transform_publisher " << tf_msg_X_.transform.translation.x << " "
+                                                                         << tf_msg_X_.transform.translation.y << " "
+                                                                         << tf_msg_X_.transform.translation.z << " "
+                                                                         << tf_msg_X_.transform.rotation.x << " "
+                                                                         << tf_msg_X_.transform.rotation.y << " "
+                                                                         << tf_msg_X_.transform.rotation.z << " "
+                                                                         << tf_msg_X_.transform.rotation.w << " "
+                                                                         << tool_frame << " " << FK_sensor_frame);
+
+            // Send solution to tf server
+            static_tf_broadcaster_.sendTransform(tf_msg_X_);
+
+            // Convert solution to transform
+            tf2::fromMsg(tf_msg_X_.transform, tf_X_);
+            tf_X_inv_ = tf_X_.inverse();
+
+            // Compute vr offsets (world to vr frame) from solution and sampled poses
+            for (int i = 0; i < tf_tool0_.size(); i++) {
+                tf_vr_offset_ = tf_tool0_[i]*tf_X_*tf_sensor_[i];
+
+                // Convert to Eigen
+                tf2::convert(tf_vr_offset_, tf_msg_vr_offset_.transform);
+                tf2::fromMsg(tf_msg_vr_offset_.transform.translation, eigen_vr_offset_translations_[i]);
+                tf2::fromMsg(tf_msg_vr_offset_.transform.rotation,       eigen_vr_offset_rotations_[i]);
+            }
+
+            // Compute average of vr offsets and populate transform msg
+            geometry_msgs::TransformStamped tf_msg_avg_;
+
+            geometry_msgs::Point tf_translation_ = tf2::toMsg(dr::averagePositions<double>(eigen_translations_) );
+            tf_msg_avg_.transform.translation.x  = tf_translation_.x;
+            tf_msg_avg_.transform.translation.y  = tf_translation_.y;
+            tf_msg_avg_.transform.translation.z  = tf_translation_.z;
+
+            tf_msg_avg_.transform.rotation       = tf2::toMsg(dr::averageQuaternions<double>(eigen_rotations_) );
+
+            // Convert average transform msg to tf2
+            tf2::convert(tf_msg_avg_.transform, tf_vr_offset_);
+
+            // Set new offset parameters based on transformation
+            srv_reconf_req_.config.doubles[0].value = tf_vr_offset_.getOrigin().getX();
+            srv_reconf_req_.config.doubles[1].value = tf_vr_offset_.getOrigin().getY();
+            srv_reconf_req_.config.doubles[2].value = tf_vr_offset_.getOrigin().getZ();
+            // Orientation as RPY-angles
+            tf_vr_offset_.getBasis().getRPY(roll_offset, pitch_offset, yaw_offset);
+            srv_reconf_req_.config.doubles[3].value = yaw_offset;
+            srv_reconf_req_.config.doubles[4].value = pitch_offset;
+            srv_reconf_req_.config.doubles[5].value = roll_offset;
+
+            // Send request to the dynamic reconfigure service in the VIVE bridge node
+            ros::service::call("/vive_node/set_parameters", srv_reconf_req_, srv_reconf_resp_);
+
+            return true;
+
+
+            // // Lookup transformation from tool frame to world frame
+            // tf_msg_ = tf_buffer_.lookupTransform(world_frame, ros::Time(0), tool_frame, ros::Time(0), world_frame);
+            // tf2::fromMsg(tf_msg_.transform, tf_tool0_[1]);
+
+            // if (SampleSensor(controller_frame, vr_frame, averaging_samples, sampling_frequency, tf_msg_) ) {
+            //     // Convert current controller pose to transform
+            //     tf2::fromMsg(tf_msg_.transform, tf_controller_);
+
+            //     tf_vr_offset_ = tf_tool0_[1]*tf_X_*tf_controller_;
+
+            //     // Set new offset parameters based on transformation
+            //     srv_reconf_req_.config.doubles[0].value = tf_vr_offset_.getOrigin().getX();
+            //     srv_reconf_req_.config.doubles[1].value = tf_vr_offset_.getOrigin().getY();
+            //     srv_reconf_req_.config.doubles[2].value = tf_vr_offset_.getOrigin().getZ();
+            //     // Orientation as RPY-angles
+            //     tf_vr_offset_.getBasis().getRPY(roll_offset, pitch_offset, yaw_offset);
+            //     srv_reconf_req_.config.doubles[3].value = yaw_offset;
+            //     srv_reconf_req_.config.doubles[4].value = pitch_offset;
+            //     srv_reconf_req_.config.doubles[5].value = roll_offset;
+
+            //     // Send request to the dynamic reconfigure service in the VIVE bridge node
+            //     ros::service::call("/vive_node/set_parameters", srv_reconf_req_, srv_reconf_resp_);
+
+            //     return true;
+            // } else {
+            //     return false;
+            // } // if (SampleSensor(controller_frame, vr_frame, averaging_samples, sampling_frequency, tf_msg_) )
+        } else {
+            return false;
+        } // if (compute_srv.response.success)
+
+        return false;
+    } // if (compute_client.call(compute_srv) )
 }
 
 void CalibratingNode::ParkMartinExample() {
@@ -392,8 +782,8 @@ void CalibratingNode::ParkMartinExample() {
     vive_calibrating::ComputeCalibration compute_srv;
     if (compute_client.call(compute_srv) ) {
         if (compute_srv.response.success) {
-            geometry_msgs::TransformStamped tf_msg_Tx_ = compute_srv.response.X;
-            ROS_INFO_STREAM(tf_msg_Tx_);
+            tf_msg_X_ = compute_srv.response.X;
+            ROS_INFO_STREAM(tf_msg_X_);
         } else {
             ROS_ERROR("Failed solving the provided AX=XB problem");
         }
@@ -409,13 +799,19 @@ int main(int argc, char** argv) {
 
     CalibratingNode node_(120);
 
-    if (!node_.Init() ) {
-        exit(EXIT_FAILURE);
-    }
+    // Handle signal [ctrl + c]
+    signal(SIGINT, IntHandler);
 
-    // while (ros::ok() ) {
-    //     node_.Loop();
-    // }
+    if (!node_.Init() ) {
+        node_.Shutdown();
+
+        // Handle sigint
+        if (sigint_flag) {
+            exit(EXIT_SUCCESS);
+        } else {
+            exit(EXIT_FAILURE);
+        }
+    }
 
     node_.Shutdown();
     exit(EXIT_SUCCESS);

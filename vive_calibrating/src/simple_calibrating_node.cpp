@@ -1,3 +1,5 @@
+#include <signal.h>
+
 // ROS
 #include <ros/ros.h>
 
@@ -11,14 +13,17 @@
 #include <dynamic_reconfigure/Config.h>
 #include <dynamic_reconfigure/Reconfigure.h>
 
-#include "vive_calibrating/ViveConfig.h"
-
 // tf2
 #include <tf2_ros/transform_listener.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
-// Boost
-#include <boost/algorithm/string/predicate.hpp>
+
+// Handle signal [ctrl + c]
+bool sigint_flag = true;
+
+void IntHandler(int signal) {
+    sigint_flag = false;
+}
 
 
 class CalibratingNode {
@@ -31,8 +36,6 @@ class CalibratingNode {
     // Callback functions
     void JoyCb(const sensor_msgs::Joy& msg_);
     void DevicesCb(const vive_bridge::TrackedDevicesStamped& msg_);
-
-    bool ValidateDeviceID(std::string device_id);
 
     // msgs
     geometry_msgs::TransformStamped tf_msg_;
@@ -51,7 +54,7 @@ class CalibratingNode {
     tf2_ros::Buffer tf_buffer_;
     tf2_ros::TransformListener *tf_listener_;
 
-    std::string controller_frame;
+    std::string controller_frame, vr_frame, world_frame;
     tf2::Transform tf_controller_, tf_controller_offset_;
 
 
@@ -100,53 +103,14 @@ CalibratingNode::CalibratingNode(int frequency)
 CalibratingNode::~CalibratingNode() {
 }
 
-bool CalibratingNode::ValidateDeviceID(std::string device_id) {
-     /**
-      * Validate device ID by checking string format and character length.
-      * The serial number of tracked devices is 12 characters.
-      */
-    
-    if (boost::algorithm::contains(device_id, "hmd_") ) {
-        if (strlen(device_id.c_str() ) == 16) {
-            return true;
-        }
-    }
-    if (boost::algorithm::contains(device_id, "controller_") ) {
-        if (strlen(device_id.c_str() ) == 23) {
-            return true;
-        }
-    }
-    if (boost::algorithm::contains(device_id, "tracker_") ) {
-        if (strlen(device_id.c_str() ) == 20) {
-            return true;
-        }
-    }
-    if (boost::algorithm::contains(device_id, "lighthouse_") ) {
-        if (strlen(device_id.c_str() ) == 23) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
 bool CalibratingNode::InitParams() {
      /**
       * Initialize parameters from the parameter server.
       * Return true if the parameters were retrieved from the server, false otherwise.
       */
     
-    std::string controller;
-
-    bool init_success = nh_.param<std::string>("/vive_calibrating_node/controller", controller, "");
-    
-    // Use controller from parameter server
-    if (ValidateDeviceID(controller) ) {
-        controller_frame = controller;
-        joy_sub_ = nh_.subscribe("/vive_node/joy/" + controller_frame, 1, &CalibratingNode::JoyCb, this);
-    }
-
-    return init_success;
+    return (nh_.param<std::string>("/vive_node/world_frame", world_frame, "root") &&
+            nh_.param<std::string>("/vive_node/vr_frame", vr_frame, "world_vr") );
 }
 
 bool CalibratingNode::Init() {
@@ -156,26 +120,34 @@ bool CalibratingNode::Init() {
 
     if (!InitParams() ) {
         ROS_WARN("Failed getting parameters from the parameter server.");
+
+        return false;
     }
 
     if (controller_frame.empty() ) {
-        while (controller_frame.empty() ) {
+        while (controller_frame.empty() && sigint_flag) {
             ROS_INFO("Waiting for controller...");
             
             ros::spinOnce();
-            ros::Duration(1.0).sleep();
+            ros::Duration(3.0).sleep();
         }
     }
+
+    // Handle sigint
+    if (!sigint_flag) {
+        return false;
+    }
+
     ROS_INFO_STREAM("Using " + controller_frame + " for calibration");
 
     joy_sub_ = nh_.subscribe("/vive_node/joy/" + controller_frame, 1, &CalibratingNode::JoyCb, this);
 
     std::string pError;
     if (!tf_buffer_.canTransform(controller_frame,
-                                 "world", ros::Time(0),
+                                 world_frame, ros::Time(0),
                                  ros::Duration(5.0), &pError) )
     {
-        ROS_ERROR_STREAM("Can't transform from world to " + controller_frame + ": " + pError);
+        ROS_ERROR_STREAM("Can't transform from " + world_frame + " to " + controller_frame + ": " + pError);
 
         return false;
     }
@@ -197,7 +169,7 @@ void CalibratingNode::Shutdown() {
      * Runs before shutting down the node
      */
 
-
+    ros::shutdown();
 }
 
 void CalibratingNode::JoyCb(const sensor_msgs::Joy& msg_) {
@@ -254,7 +226,12 @@ int main(int argc, char** argv) {
     CalibratingNode node_(120);
 
     if (!node_.Init() ) {
-        exit(EXIT_FAILURE);
+        // Handle sigint
+        if (!sigint_flag) {
+            exit(EXIT_SUCCESS);
+        } else {
+            exit(EXIT_FAILURE);
+        }
     }
 
     while (ros::ok() ) {

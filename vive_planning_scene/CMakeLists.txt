@@ -9,13 +9,19 @@ add_compile_options(-std=c++11)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   roscpp
+  rosbag
+  sophus_ros_conversions
   geometry_msgs
   moveit_msgs
   shape_msgs
   rviz_visual_tools
   vive_bridge
 )
+
+# SDF
 find_package(SDFormat REQUIRED)
+# Ceres solver
+find_package(Ceres REQUIRED)
 
 ## System dependencies are found with CMake's conventions
 find_package(Boost REQUIRED COMPONENTS system)
@@ -25,6 +31,12 @@ find_package(Eigen3 REQUIRED)
 if(NOT EIGEN3_INCLUDE_DIRS)
   set(EIGEN3_INCLUDE_DIRS ${EIGEN3_INCLUDE_DIR})
 endif()
+
+# Sophus - C++ implementation of Lie Groups using Eigen
+## Set Sophus headers path
+set(SOPHUS "$ENV{HOME}/lib/sophus")
+set(sophus_INCLUDE_DIRS ${SOPHUS})
+find_package(Sophus 1.0.0 EXACT REQUIRED PATHS ${SOPHUS}/build NO_DEFAULT_PATH)
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -116,6 +128,11 @@ catkin_package(
 #  LIBRARIES vive_planning_scene
 #  CATKIN_DEPENDS geometry_msgs moveit_msgs roscpp shape_msgs
 #  DEPENDS system_lib
+CATKIN_DEPENDS
+  roscpp
+  eigen
+DEPENDS
+  sophus_ros_conversions
 )
 
 ###########
@@ -127,6 +144,8 @@ catkin_package(
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}
+  ${CERES_INCLUDE_DIRS}
+  ${sophus_INCLUDE_DIRS}
   ${SDFormat_INCLUDE_DIRS}
 )
 
@@ -134,6 +153,7 @@ include_directories(
 # add_library(${PROJECT_NAME}
 #   src/${PROJECT_NAME}/vive_planning_scene.cpp
 # )
+add_library(sdf_interface src/sdf_interface.cpp)
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
@@ -143,7 +163,8 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-add_executable(${PROJECT_NAME}_node src/vive_scene_node.cpp)
+add_executable(${PROJECT_NAME}_node src/vive_scene_node.cpp
+                                    src/sdf_interface.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -158,7 +179,9 @@ add_executable(${PROJECT_NAME}_node src/vive_scene_node.cpp)
 ## Specify libraries to link a library or executable target against
 target_link_libraries(${PROJECT_NAME}_node
   ${catkin_LIBRARIES}
+  ${CERES_LIBRARIES}
   ${SDFormat_LIBRARIES}
+  sdf_interface
 )
 
 #############

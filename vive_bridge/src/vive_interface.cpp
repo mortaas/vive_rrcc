@@ -41,7 +41,7 @@ ViveInterface::ViveInterface()
 ViveInterface::~ViveInterface() {
 }
 
-bool ViveInterface::Init() {
+bool ViveInterface::Init(int argc, char **argv) {
       /**
      * Initialize the OpenVR API and get access to the vr::IVRSystem interface.
      * The vr::IVRSystem interface provides access to display configuration information, 
@@ -57,6 +57,34 @@ bool ViveInterface::Init() {
         VR_FATAL("OpenVR API initialization failed: " + std::string(vr::VR_GetVRInitErrorAsEnglishDescription(peError) ) );
 		return false;
 	}
+
+
+    // // Camera interface
+    // pCamera_ = INVALID_TRACKED_CAMERA_HANDLE;
+    // pCamera_ = vr::VRTrackedCamera();
+
+    // if (!pCamera_) {
+    //     VR_WARN("Camera interface initialization failed");
+    // } else {
+    //     // Check if camera is available
+    //     bool bHasCamera = false;
+    //     vr::EVRTrackedCameraError nCameraError = pCamera_->HasCamera(vr::k_unTrackedDeviceIndex_Hmd, &bHasCamera);
+
+    //     if (nCameraError == vr::VRTrackedCameraError_None && bHasCamera) {
+    //         // Check firmware description of camera to ensure that the communication is valid
+    //         vr::TrackedPropertyError pError = vr::TrackedProp_UnknownProperty;
+    //         std::string string_prop = GetStringProperty(vr::k_unTrackedDeviceIndex_Hmd, vr::Prop_CameraFirmwareDescription_String, &pError);
+
+    //         if (pError != vr::TrackedProp_Success) {
+    //             VR_ERROR("Error occurred when getting camera firmware description from HMD: " + TrackedPropErrorStrings[pError] );
+    //         } else {
+    //             VR_INFO("Camera is available with firmware: \n" + string_prop);
+    //         }
+    //     } else {
+    //         VR_WARN("Camera is not available");
+    //     }
+    // }
+
 
     VR_INFO("OpenVR API initialization succeeded");
     return true;
@@ -78,7 +106,7 @@ void ViveInterface::Shutdown() {
 std::string ViveInterface::GetStringProperty(vr::TrackedDeviceIndex_t unDeviceIndex, vr::TrackedDeviceProperty prop, vr::TrackedPropertyError *pError) {
       /**
      * Returns the static string property of a tracked device.
-     *  
+     * 
      * vr::TrackedDeviceIndex unDeviceIndex - Index of the device to get the property for.
      * vr::TrackedDeviceProperty prop - Which property to get.
      */
@@ -99,7 +127,7 @@ std::string ViveInterface::GetStringProperty(vr::TrackedDeviceIndex_t unDeviceIn
     return strValue;
 }
 
-void ViveInterface::GetControllerState(const int &device_index, std::vector<float> &axes, std::vector<int> &buttons) {
+void ViveInterface::GetControllerState(const unsigned int &device_index, std::vector<float> &axes, std::vector<int> &buttons) {
       /**
      * Get controller state and map it to axes and buttons
      */
@@ -127,7 +155,7 @@ void ViveInterface::GetControllerState(const int &device_index, std::vector<floa
     }
 }
 
-bool ViveInterface::PollNextEvent(int &event_type, int &device_index) {
+bool ViveInterface::PollNextEvent(unsigned int &event_type, unsigned int &device_index) {
       /**
      * Returns true if there is any event waiting in the event queue,
      * and also returns the event type and device index of this event.
@@ -148,7 +176,7 @@ bool ViveInterface::PollNextEvent(int &event_type, int &device_index) {
     }
 }
 
-void ViveInterface::GetDeviceSN(const int &device_index, std::string &device_sn) {
+void ViveInterface::GetDeviceSN(const unsigned int &device_index, std::string &device_sn) {
     /**
      * Get the serial number of a tracked device
      */
@@ -161,7 +189,7 @@ void ViveInterface::GetDeviceSN(const int &device_index, std::string &device_sn)
     }
 }
 
-void ViveInterface::GetDevicePose(const int &device_index, float m[3][4]) {
+void ViveInterface::GetDevicePose(const unsigned int &device_index, float m[3][4]) {
     /**
      * Get the pose of a tracked device
      * This pose is represented as the top 3 rows of a homogeneous transformation matrix
@@ -171,7 +199,7 @@ void ViveInterface::GetDevicePose(const int &device_index, float m[3][4]) {
         for (int j = 0; j < 4; j++)
             m[i][j] = device_poses_[device_index].mDeviceToAbsoluteTracking.m[i][j];
 }
-void ViveInterface::GetDeviceVelocity(const int &device_index, float linear[3], float angular[3]) {
+void ViveInterface::GetDeviceVelocity(const unsigned int &device_index, float linear[3], float angular[3]) {
     /**
      * Get the linear and angular velocity (twist) of a tracked device
      */
@@ -182,7 +210,7 @@ void ViveInterface::GetDeviceVelocity(const int &device_index, float linear[3], 
     }
 }
 
-int ViveInterface::GetDeviceClass(const int &device_index) {
+unsigned char ViveInterface::GetDeviceClass(const unsigned int &device_index) {
     /**
      * Get the class of a tracked device
      */
@@ -190,7 +218,15 @@ int ViveInterface::GetDeviceClass(const int &device_index) {
     return pHMD_->GetTrackedDeviceClass(device_index);
 }
 
-bool ViveInterface::PoseIsValid(const int &device_index) {
+unsigned char ViveInterface::GetControllerRole(const unsigned int &device_index) {
+    /**
+     * Get the controller role of a tracked device, e.g. left or right hand
+     */
+    
+    return pHMD_->GetControllerRoleForTrackedDeviceIndex(device_index);
+}
+
+bool ViveInterface::PoseIsValid(const unsigned int &device_index) {
     /**
      * Check if the pose of a tracked device is valid
      */
@@ -202,11 +238,25 @@ bool ViveInterface::PoseIsValid(const int &device_index) {
 
 void ViveInterface::Update() {
     /*
-    * Calculates updated poses for all tracked devices
+    * Calculates updated poses and velocities for all tracked devices
     * TrackingUniverseRawAndUncalibrated - provides poses relative to the hardware-specific coordinate system in the driver
     */
     
-    pHMD_->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseRawAndUncalibrated, 0, device_poses_, vr::k_unMaxTrackedDeviceCount);
+    pHMD_->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0, device_poses_, vr::k_unMaxTrackedDeviceCount);
+}
+
+void ViveInterface::TriggerHapticPulse(const unsigned int &device_index, const unsigned short &duration) {
+    /*
+    * Triggers a single haptic pulse on a controller given its device index, and the pulse duration 0-3999 µs ("strength")
+    */
+
+    if (GetDeviceClass(device_index) == vr::TrackedDeviceClass_Controller) {
+        unsigned short usDurationMicroSec = duration;
+        usDurationMicroSec = std::min(usDurationMicroSec, (unsigned short) 3999);
+        usDurationMicroSec = std::max(usDurationMicroSec, (unsigned short)    0);
+
+        pHMD_->TriggerHapticPulse(device_index, 0, usDurationMicroSec);
+    }
 }
 
 // Logging to ROS

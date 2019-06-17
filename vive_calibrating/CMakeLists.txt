@@ -4,6 +4,13 @@ project(vive_calibrating)
 ## Compile as C++11, supported in ROS Kinetic and newer
 add_compile_options(-std=c++11)
 
+# Sophus - C++ implementation of Lie Groups using Eigen
+## Set Sophus headers path
+## ENV reads paths from a system environment variable
+set(SOPHUS "$ENV{HOME}/lib/sophus")
+set(sophus_INCLUDE_DIRS ${SOPHUS})
+find_package(Sophus 1.0.0 EXACT REQUIRED PATHS ${SOPHUS}/build NO_DEFAULT_PATH)
+
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
@@ -21,17 +28,20 @@ find_package(catkin REQUIRED COMPONENTS
   moveit_ros_planning_interface
   rviz_visual_tools
   vive_bridge
+  sophus_ros_conversions
 )
 
 ## System dependencies are found with CMake's conventions
 find_package(Boost REQUIRED COMPONENTS system)
 
-find_package(Eigen3 REQUIRED)
-# Eigen 3.2 (Wily) only provides EIGEN3_INCLUDE_DIR, not EIGEN3_INCLUDE_DIRS
-if(NOT EIGEN3_INCLUDE_DIRS)
-  set(EIGEN3_INCLUDE_DIRS ${EIGEN3_INCLUDE_DIR})
-endif()
+# find_package(Eigen3 REQUIRED)
+# # Eigen 3.2 (Wily) only provides EIGEN3_INCLUDE_DIR, not EIGEN3_INCLUDE_DIRS
+# if(NOT EIGEN3_INCLUDE_DIRS)
+#   set(EIGEN3_INCLUDE_DIRS ${EIGEN3_INCLUDE_DIR})
+# endif()
 
+# Ceres solver
+find_package(Ceres REQUIRED)
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -120,9 +130,12 @@ generate_messages(
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES vive_calibrating
-#  CATKIN_DEPENDS geometry_msgs moveit_msgs roscpp shape_msgs
-   CATKIN_DEPENDS message_runtime
-#  DEPENDS system_lib
+  CATKIN_DEPENDS
+    roscpp
+    message_runtime
+    eigen
+  DEPENDS
+    sophus_ros_conversions
 )
 
 ###########
@@ -134,12 +147,15 @@ catkin_package(
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}
+  ${sophus_INCLUDE_DIRS}
+  ${CERES_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
 #   src/${PROJECT_NAME}/vive_calibrating.cpp
 # )
+add_library(robot_interface src/robot_interface.cpp)
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
@@ -151,9 +167,11 @@ include_directories(
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(simple_calibrating_node src/simple_calibrating_node.cpp)
 add_executable(manual_calibrating_node src/manual_calibrating_node.cpp)
-add_executable(vive_robot_calibrating_node src/vive_robot_calibrating_node.cpp)
+add_executable(vive_robot_calibrating_node src/vive_robot_calibrating_node.cpp
+                                           src/robot_interface.cpp)
 add_executable(parkmartin_node src/parkmartin_node.cpp)
-add_executable(cal_test src/cal_test.cpp)
+add_executable(simple_calibration_test src/simple_calibration_test.cpp)
+add_executable(tool_calibrating_node src/tool_calibrating_node.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -169,17 +187,25 @@ add_executable(cal_test src/cal_test.cpp)
 target_link_libraries(simple_calibrating_node
   ${catkin_LIBRARIES}
 )
+target_link_libraries(simple_calibration_test
+  ${catkin_LIBRARIES}
+)
+
 target_link_libraries(manual_calibrating_node
   ${catkin_LIBRARIES}
 )
 target_link_libraries(vive_robot_calibrating_node
   ${catkin_LIBRARIES}
+  robot_interface
 )
+
 target_link_libraries(parkmartin_node
   ${catkin_LIBRARIES}
+  ${CERES_LIBRARIES}
 )
-target_link_libraries(cal_test
+target_link_libraries(tool_calibrating_node
   ${catkin_LIBRARIES}
+  ${CERES_LIBRARIES}
 )
 
 #############

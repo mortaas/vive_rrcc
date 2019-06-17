@@ -1,6 +1,6 @@
-# vive_bridge
+# Vive Bridge
 
-vive_bridge is a [Robotic Operating System (ROS)](http://www.ros.org/) package that utilises the [OpenVR SDK](https://github.com/ValveSoftware/openvr) by Valve, to make VR devices such as the HTC VIVE available in a ROS environment. The package is inspired by an existing [vive_ros](https://github.com/robosavvy/vive_ros) package by RoboSavvy, and it exposes a lot of the same functionality. The essentials of the [OpenVR SDK](https://github.com/ValveSoftware/openvr) is explained in great detail in the [OpenVR Quick Start](https://github.com/osudrl/CassieVrControls/wiki/OpenVR-Quick-Start) guide by Kevin Kellar. The guide is also saved locally in this package under the ```doc/CassieVrControls.wiki``` folder.
+Vive Bridge is a [Robotic Operating System (ROS)](http://www.ros.org/) package that utilises the [OpenVR SDK](https://github.com/ValveSoftware/openvr) by Valve, or alternatively [LibSurvive](https://github.com/cnlohr/libsurvive), to make VR devices such as the HTC Vive available in a ROS environment. The package is inspired by an existing [vive_ros](https://github.com/robosavvy/vive_ros) package by RoboSavvy, and it exposes a lot of the same functionality. The essentials of the [OpenVR SDK](https://github.com/ValveSoftware/openvr) is explained in great detail in the [OpenVR Quick Start](https://github.com/osudrl/CassieVrControls/wiki/OpenVR-Quick-Start) guide by Kevin Kellar.
 
 
 ## Features
@@ -11,11 +11,16 @@ The package supports the following types of devices:
 * Tracker
 * Lighthouse
 
-The package exposes the position and orientation (pose) of each device as coordinate frames relative to the *world_vr* frame in the tf tree, which is configurable relative to the *world* frame. The naming scheme of each coordinate frame follows the following structure: &lt;device type&gt;_&lt;serial number&gt;, e.g. *controller_LHR_FF6FFD46*. The serial number is used both internally and externally (in the package) to uniquely identify tracked devices. This results in a structure similar to the tf tree example that is shown below:
+The package exposes the position and orientation (pose) of each device as coordinate frames relative to the *world_vr* frame in the tf tree, which is configurable relative to the *world* frame. The naming scheme of each coordinate frame follows the following structure: &lt;device type&gt;\_&lt;serial number&gt;, e.g. *controller_LHR_FF6FFD46*. 
+
+The serial number is used both internally and externally (in the package) to uniquely identify tracked devices. This results in a structure similar to the tf tree example that is shown below:
 
 ![Example of the tf tree structure that is used in this package](doc/frames.png)
 
-The package can also publishes the linear and angular velocities (twists) of tracked devices as a geometry_msgs/TwistStamped message on the */vive_node/twist/&lt;device type&gt;_&lt;serial number&gt;* topic, e.g. */vive_node/twist/controller_LHR_FF6FFD46*. Axes and buttons on controllers can also be published as a sensor_msgs/Joy message on the */vive_node/joy/&lt;device type&gt;_&lt;serial number&gt;* topic, e.g. */vive_node/joy/controller_LHR_FF6FFD46*. Joy messages are only published when the controllers are interacted with. These publishers are not enabled by default, but they are easily enabled during runtime by using the [rqt_reconfigure](http://wiki.ros.org/rqt_reconfigure) package.
+The package can also publish the linear and angular velocities (twists) of tracked devices as a geometry_msgs/TwistStamped message on the */vive_node/twist/&lt;device type&gt;_&lt;serial number&gt;* topic, e.g. */vive_node/twist/controller_LHR_FF6FFD46*. 
+
+Axes and buttons on controllers can also be published as a sensor_msgs/Joy message on the */vive_node/joy/&lt;device type&gt;_&lt;serial number&gt;* topic, e.g. */vive_node/joy/controller_LHR_FF6FFD46*. Joy messages are only published when the controllers are interacted with.
+
 
 ### Visualization
 
@@ -25,10 +30,15 @@ It is also possible to visualize the tracked devices by using a MarkerArray disp
 * tracker_mesh_path
 * lighthouse_mesh_path
 
-The tracked devices are then visualized by adding ```/vive_node/rviz_mesh_markers``` as *Marker Topic* in a MarkerArray display.
-
 *The mesh files has to be supported by RViz, i.e. .stl, .mesh (Ogre) or .dae (COLLADA).*
 
+The tracked devices are then visualized by adding ```/vive_node/rviz_mesh_markers``` as *Marker Topic* in a MarkerArray display.
+
+*The following warning message is normal when starting the node:*
+```
+[ WARN] [1552396105.439729800]: Topic '/vive_node/rviz_mesh_markers' unable to connect to any subscribers within 0.5 sec. It is possible initially published visual messages will be lost.
+```
+*It just indicates that no nodes received the mesh markers that are published when the vive node starts.*
 
 ## Requirements
 
@@ -52,13 +62,39 @@ It is also possible to specify which folder the [OpenVR SDK](https://github.com/
 set(OPENVR "$ENV{HOME}/lib/openvr")
 ```
 
+### LibSurvive
+
+The package requires [LibSurvive](https://github.com/cnlohr/libsurvive), which is an open-source and reverse engineered driver, API and tools for the HTC VIVE. 
+
+```
+cd ~
+mkdir lib
+cd lib
+git clone https://github.com/cnlohr/libsurvive.git
+cd libsurvive
+make
+```
+
+It is also possible to specify which folder [LibSurvive](https://github.com/cnlohr/libsurvive) should be located in, by changing the *CMakeLists.txt* file in the package directory:
+```
+set(OPENVR "$ENV{HOME}/lib/libsurvive")
+```
+
+You also have to install the udev rules that comes with [LibSurvive](https://github.com/cnlohr/libsurvive):
+
+```
+cd lib/libsurvive
+sudo cp useful_files/81-vive.rules to /etc/udev/rules.d/
+sudo udevadm control --reload-rules && udevadm trigger
+```
+
 ### Steam and SteamVR
 
 SteamVR is available through [Steam](https://store.steampowered.com/about/), which is utilised for configuration and room setup. It is also required for running this package by itself, as it depends on the *vrserver* process running in the background. This is a requirement because the OpenVR part of the package runs as a background application ([OpenVR API Documentation](https://github.com/ValveSoftware/openvr/wiki/API-Documentation)):
 
 ```VRApplication_Background``` - The application will not start SteamVR. If it is not already running the call with VR_Init will fail with VRInitError_Init_NoServerForBackgroundApp.
 
-[Steam](https://store.steampowered.com/about/) is installed by following the *Getting Started* guide on their [Steam for Linux](https://github.com/ValveSoftware/steam-for-linux) tracker. SteamVR should be installed automatically by Steam if there is any VR devices present on your computer. It is also important to meet the **GRAPHICS DRIVER REQUIREMENTS** and the **USB DEVICE REQUIREMENTS** on their [SteamVR for Linux](https://github.com/ValveSoftware/SteamVR-for-Linux) tracker. A complete guide on getting the HTC VIVE up and running in SteamVR is available from: [HTC Vive Installation Guide](https://support.steampowered.com/steamvr/HTC_Vive/).
+[Steam](https://store.steampowered.com/about/) is installed by following the *Getting Started* guide on their [Steam for Linux](https://github.com/ValveSoftware/steam-for-linux) tracker. SteamVR should be installed automatically by Steam if there is any VR devices present on your computer. It is also important to meet the **GRAPHICS DRIVER REQUIREMENTS** and the **USB DEVICE REQUIREMENTS** on their [SteamVR for Linux](https://github.com/ValveSoftware/SteamVR-for-Linux) tracker. A complete guide on getting the Vive up and running in SteamVR is available from: [HTC Vive Installation Guide](https://support.steampowered.com/steamvr/HTC_Vive/).
 
 
 ## Installation
@@ -70,6 +106,9 @@ The package is built by cloning this repository into your catkin workspace (catk
 
 The package is simply run by launching the following launch file:
 ```roslaunch vive_bridge vive_node.launch```
+
+Alternatively, the package can be run with [LibSurvive](https://github.com/cnlohr/libsurvive) by launching the following launch file:
+```roslaunch vive_bridge survive_node.launch```. The package should expose the same functionality with both back-ends. It is possible to send console commands to [LibSurvive](https://github.com/cnlohr/libsurvive) with the ```cmd``` argument, e.g. ```cmd:="help"```.
 
 *You may have to change the directory paths for Steam and your Catkin workspace in the ```/scripts/launch.sh``` shell script depending on their location. The package assumes that the directories are in their defuault locations.*
 
@@ -103,7 +142,7 @@ It is also possible to request this information from the ```/vive_node/tracked_d
 
 ### Controller axes and buttons
 
-The package currently supports all inputs from the HTC VIVE controller, and the [sensor_msgs/Joy](http://docs.ros.org/melodic/api/sensor_msgs/html/msg/Joy.html) messages have the following format:
+The package currently supports all inputs from the Vive controller, and the [sensor_msgs/Joy](http://docs.ros.org/melodic/api/sensor_msgs/html/msg/Joy.html) messages have the following format:
 * axes[0] - Trackpad x
 * axes[1] - Trackpad y
 * axes[2] - Trigger
@@ -134,34 +173,30 @@ The position and orientation (pose) of each device is defined relative to the *w
 
 ```rosrun rqt_reconfigure rqt_reconfigure```.
 
-The parameters from [dynamic_reconfigure](http://wiki.ros.org/dynamic_reconfigure) are currently not saved automatically, and they therefore have to be updated manually in the ```/launch/vive_launch.launch``` file (see [param](http://wiki.ros.org/roslaunch/XML/param)), and in the ```/cfg/DynReconf.cfg``` file (see [How to Write Your First .cfg File](http://wiki.ros.org/dynamic_reconfigure/Tutorials/HowToWriteYourFirstCfgFile)).
+The parameters from [dynamic_reconfigure](http://wiki.ros.org/dynamic_reconfigure) are saved and loaded automatically from the ```/config/dynparam.yaml``` file.
 
-### Coordinate systems
+### Coordinate frames
 
-![Coordinate system used by the VIVE Head-Mounted Display (HMD)](doc/vive_hmd_coordinate_system.png)
+<img src="doc/vive_hmd_coordinate_system.png" alt="Coordinate system used by the Vive Head-Mounted Display (HMD)" width="400"/>
+<img src="doc/vive_controller_coordinate_system.png" alt="Coordinate system used by the Vive Controller" width="400"/>
+<img src="doc/vive_lighthouse_coordinate_system.png" alt="Coordinate system used by the Vive lighthouse" width="400"/>
 
-![Coordinate system used by the VIVE Controller](doc/vive_controller_coordinate_system.png)
-
-![Coordinate system used by the VIVE lighthouse](doc/vive_lighthouse_coordinate_system.png)
-
-Tracked devices follows the following coordinate system conventions:
+Tracked devices follows the following coordinate frames conventions:
 * X-axis equates to pitch
-* Y-axis is up and equates to yaw (except for the VIVE Tracker, which has Z-axis down)
-* Z-axis is approach direction and equates to roll (except for the VIVE Controller, which has Z-axis pointing the opposite way)
+* Y-axis is up and equates to yaw (except for the Vive Tracker, which has Z-axis down)
+* Z-axis is opposite of approach direction and equates to roll
 
-![Coordinate system used by the VIVE Tracker](doc/vive_tracker_coordinate_system.png)
+![Coordinate system used by the Vive Tracker](doc/vive_tracker_coordinate_system.png)
 
-The VIVE Tracker coordinate system is rotated 180&deg; around the x-axis such that the z-axis points upwards. This is because we want the tracker to match the orientation of our reference frame (world), when it is placed horizontally on the ground.
+~~The Vive Tracker coordinate system is rotated 180&deg; around the x-axis such that the z-axis points upwards. This is because we want the tracker to match the orientation of our reference frame (world), when it is placed horizontally on the ground.~~
+
+The original coordinate frame (x, y_0, z_0) of the Vive Tracker is used.
 
 
 ## Compatibility
 
 The package was tested with:
-* HTC VIVE with OpenVR SDK 1.0.15 and Ubuntu 16.04 LTS running ROS Kinetic Kame (1.12.13)
+* Vive with OpenVR SDK 1.4.18 and Ubuntu 16.04 LTS running ROS Kinetic Kame (1.12.13)
 
 
 ## To-do list
-* Save and load the parameters that are changed by dynamic reconfigure
-* Implement [libsurvive - lightweight HTC Vive library](https://github.com/cnlohr/libsurvive) as an alternative interface to the [OpenVR SDK](https://github.com/ValveSoftware/openvr)
-* Implement handling of tracked devices with virtual functions for drop-in support of alternative interfaces
-* Implement haptic feedback on the VIVE Controllers

@@ -1,11 +1,121 @@
 <?xml version="1.0"?>
 
 <launch>
-    <rosparam param="/vive_calibrating_node/controller">"controller_LHR_FDBBBBC0"</rosparam>
+    <!-- Constants -->
+    <arg name="M_PI"   value="3.14159265358979323846"/>
+    <arg name="M_PI_2" value="1.57079632679489661923"/>
+    <arg name="M_PI_4" value="0.78539816339744830962"/>
 
-    <!-- <node pkg="tf2_ros" type="static_transform_publisher" name="static_tracker1_publisher" args="-0.124 0.046 0.025 0.0 -1.57079632679 0.0 camera_house tracker1_desired" />
-    <node pkg="tf2_ros" type="static_transform_publisher" name="static_tracker2_publisher" args="0.124 0.046 0.025 0.0 1.57079632679 0.0 camera_house tracker2_desired" /> -->
+    <!-- Flags -->
+    <arg name="calibrate"      default="true"/>
+    <arg name="soft_calibrate" default="false"/>
+    <arg name="validate"       default="false"/>
 
+    <!-- Controller frame -->
+    <arg name="controller" default="controller_LHR_FDB9BFC4"/>
+
+    <!-- MoveIt! manipulator group -->
+    <arg name="group"      default="floor_manipulator"/>
+
+
+    <!-- Number of pose samples to average for each measurement -->
+    <arg name="samples"    default="480"/>
+    <!-- Sampling frequency used for averaging -->
+    <arg name="frequency"  default="30"/>
+    <!-- Number of measurements for calibration (>= 3) -->
+    <arg name="stations"   default="10"/>
+
+    <!-- Robot sleep duration before final calibration measurement -->
+    <!-- <arg name="cduration"   default="600."/> -->
+    <!-- Robot sleep duration before sampling poses -->
+    <arg name="duration"   default="20."/>
+
+
+    <!-- Launch the calibration node -->
     <node name="parkmartin_node" pkg="vive_calibrating" type="parkmartin_node" output="screen" required="true"/>
-    <node name="vive_calibrating_node" pkg="vive_calibrating" type="manual_calibrating_node" output="screen" required="true"/>
+
+    <!-- Launch the sampling node -->
+    <node name="vive_robot_calibrating_node" pkg="vive_calibrating" type="vive_robot_calibrating_node" output="screen" required="true">
+        <param name="calibrate_flag"                value="$(arg calibrate)"/>
+        <param name="soft_calibrate_flag"           value="$(arg soft_calibrate)"/>
+        <param name="validate_flag"                 value="$(arg validate)"/>
+
+        <param name="controller_frame"              value="$(arg controller)"/>
+        <param name="planning_group"                value="$(arg group)"/>
+
+        <param name="averaging_samples"             value="$(arg samples)"/>
+        <param name="sampling_frequency"            value="$(arg frequency)"/>
+        <param name="calibration_stations"          value="$(arg stations)"/>
+
+        <!-- <param name="calibration_sleep_duration"    value="$(arg cduration)"/> -->
+        <param name="sample_sleep_duration"         value="$(arg duration)"/>
+        
+
+        <!-- Sphere sampling parameters for calibration -->
+        <param name="radius_lower_bound"            value="1.4"/>
+        <param name="radius_upper_bound"            value="1.6"/>
+
+
+        <!-- <param name="theta_position_lower_bound"    value="$(eval 5.75 * arg('M_PI_4') )"/>
+        <param name="theta_position_upper_bound"    value="$(eval 6.25 * arg('M_PI_4') )"/> -->
+
+        <!-- <param name="theta_position_lower_bound"    value="$(eval -0.25 * arg('M_PI_4') )"/>
+        <param name="theta_position_upper_bound"    value="$(eval  0.25 * arg('M_PI_4') )"/> -->
+
+
+        <!-- Floor -->
+        <param name="theta_position_lower_bound"    value="$(eval -1.25 * arg('M_PI_4') )"/>
+        <param name="theta_position_upper_bound"    value="$(eval -0.75 * arg('M_PI_4') )"/>
+        <param name="phi_position_lower_bound"      value="$(eval  0.5  * arg('M_PI_4') )"/>
+        <param name="phi_position_upper_bound"      value="$(eval  0.75 * arg('M_PI_4') )"/>
+
+        <!-- Gantry -->
+        <!-- <param name="theta_position_lower_bound"    value="$(eval  2.25 * arg('M_PI_4') )"/>
+        <param name="theta_position_upper_bound"    value="$(eval  1.75 * arg('M_PI_4') )"/>
+        <param name="phi_position_lower_bound"      value="$(eval  0.5  * arg('M_PI_4') )"/>
+        <param name="phi_position_upper_bound"      value="$(eval  0.75 * arg('M_PI_4') )"/> -->
+
+
+        <!-- <param name="theta_orientation_lower_bound" value="$(eval 5.   * arg('M_PI_4') )"/>
+        <param name="theta_orientation_upper_bound" value="$(eval 6.   * arg('M_PI_4') )"/> -->
+
+        <!-- <param name="theta_orientation_lower_bound" value="$(eval -1.  * arg('M_PI_4') )"/>
+        <param name="theta_orientation_upper_bound" value="$(eval  1.  * arg('M_PI_4') )"/> -->
+
+
+        <!-- Floor -->
+        <param name="theta_orientation_lower_bound" value="$(eval  0.   * arg('M_PI_4') )"/>
+        <param name="theta_orientation_upper_bound" value="$(eval -2.   * arg('M_PI_4') )"/>
+        <param name="phi_orientation_lower_bound"   value="$(eval  1.25 * arg('M_PI_4') )"/>
+        <param name="phi_orientation_upper_bound"   value="$(eval  2.75 * arg('M_PI_4') )"/>
+
+        <!-- Gantry -->
+        <!-- <param name="theta_orientation_lower_bound" value="$(eval  1.25 * arg('M_PI_4') )"/>
+        <param name="theta_orientation_upper_bound" value="$(eval  2.75 * arg('M_PI_4') )"/>
+        <param name="phi_orientation_lower_bound"   value="$(eval  1.5  * arg('M_PI_4') )"/>
+        <param name="phi_orientation_upper_bound"   value="$(eval  2.5  * arg('M_PI_4') )"/> -->
+
+
+        <!-- Parameters for sampling of rectangular tracking volume -->
+        <param name="length"                        value="2."/>
+        <param name="width"                         value="1."/>
+        
+        <param name="length_segments"               value="6"/>
+        <param name="width_segments"                value="3"/>
+
+        <param name="x_center"                      value="-1."/>
+        <param name="y_center"                      value="-1."/>
+        <param name="z_center"                      value=" 1."/>
+
+        <!-- Robot and sensor test frames -->
+        <!-- <rosparam param="base_frame">"floor_base"</rosparam> -->
+        <!-- <rosparam param="tool_frame">"floor_tool0"</rosparam> -->
+        <rosparam param="base_frame">"floor_base"</rosparam>
+        <rosparam param="tool_frame">"floor_tool0"</rosparam>
+        <rosparam param="FK_sensor_frame">"FK_sensor"</rosparam>
+
+        <!-- Robot joint states -->
+        <rosparam param="joints_folded">"[0.0, -2.5900040327772613, 2.3999184786133068, -2.6179938779914945e-05, 0.799936756066561, 8.377580409572782e-05]"</rosparam>
+        <rosparam param="joints_home">"[0.0, -1.5708155254166685, 1.5708399600261964, 0.0, 2.6179938779914945e-05, 0.0]"</rosparam>
+    </node>
 </launch>

@@ -62,6 +62,14 @@
   <exec_depend>roscpp</exec_depend>
   <exec_depend>shape_msgs</exec_depend>
 
+  <build_depend>sophus</build_depend>
+  <exec_depend>sophus</exec_depend>
+  <build_depend>sophus_ros_conversions</build_depend>
+  <exec_depend>sophus_ros_conversions</exec_depend>
+
+  <build_depend>eigen</build_depend>
+  <exec_depend>eigen</exec_depend>
+
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>

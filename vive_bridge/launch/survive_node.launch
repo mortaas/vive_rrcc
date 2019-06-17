@@ -1,14 +1,16 @@
 <?xml version="1.0"?>
 
 <launch>
+    <arg name="cmd" default="" />
+
     <arg name="world_frame"   default="root"/>
     <arg name="vr_frame"      default="world_vr"/>
 
     <!-- Load dynamic reconfigure parameters -->
-    <node name="vive_dynparam" pkg="dynamic_reconfigure" type="dynparam" args="load vive_node $(find vive_bridge)/config/dynparam.yaml"/>
+    <!-- <node name="vive_dynparam" pkg="dynamic_reconfigure" type="dynparam" args="load vive_node $(find vive_bridge)/cfg/dynparam.yaml"/> -->
 
     <!-- Launch node through steam with shell script -->
-    <node name="vive_node" pkg="vive_bridge" type="launch.sh" output="screen" required="true">
+    <node name="vive_node" pkg="vive_bridge" type="survive_bridge_node" output="screen" required="true" args="$(arg cmd)">
         <!-- VIVE meshes -->
         <rosparam param="hmd_mesh_path">"package://vive_bridge/meshes/vive_pro_headset/vive_pro_headset.dae"</rosparam>
         <rosparam param="controller_mesh_path">"package://vive_bridge/meshes/vr_controller_vive_1_5/vr_controller_vive_1_5.dae"</rosparam>
